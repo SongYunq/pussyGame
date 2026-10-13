@@ -49,20 +49,34 @@ export const api = {
     request<{ list: LedgerItem[]; total: number }>(`/api/user/ledger?page=${page}&pageSize=${pageSize}`),
 
   // 房主/管理员专区
-  adminCreateUser: (data: { username: string; password: string; nickname: string; avatar: string; initialChips: number }) =>
+  adminCreateUser: (data: { username: string; password: string; nickname: string; avatar: string; initialChips: number; role?: 'player' | 'admin' }) =>
     request<{ id: number; username: string; balance: number }>('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
+  adminDeleteUser: (userId: number) =>
+    request<{ message: string }>(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  adminUpdateUser: (userId: number, data: { nickname?: string; avatar?: string; role?: 'player' | 'admin'; isBanned?: boolean }) =>
+    request<UserProfile>(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   adminGetUsers: () =>
-    request<Array<UserProfile & { isOnline: boolean; currentRoomId: string | null; createdAt: string }>>('/api/admin/users'),
+    request<Array<UserProfile & { isOnline: boolean; currentRoomId: string | null; isBanned?: boolean; createdAt: string }>>('/api/admin/users'),
 
   adminAdjustChips: (userId: number, amount: number, reason: string) =>
     request<{ userId: number; balance: number }>(`/api/admin/users/${userId}/chips`, {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
     }),
+
+  adminGetChipLogs: (page = 1, pageSize = 50) =>
+    request<{ list: Array<{ id: number; userId: number; username: string; amount: number; balanceAfter: number; reason: string; createdAt: string; operator: string }>; total: number }>(`/api/admin/chips/logs?page=${page}&pageSize=${pageSize}`),
 
   adminResetPassword: (userId: number, newPassword: string) =>
     request<{ message: string }>(`/api/admin/users/${userId}/reset-password`, {
@@ -72,4 +86,20 @@ export const api = {
 
   adminGetAuditLogs: (page = 1, pageSize = 50) =>
     request<{ list: unknown[]; total: number }>(`/api/admin/audit-logs?page=${page}&pageSize=${pageSize}`),
+
+  // 发牌算法调控
+  adminGetAlgorithmConfig: () =>
+    request<unknown>('/api/admin/algorithm/config'),
+
+  adminSaveAlgorithmConfig: (config: unknown) =>
+    request<{ message: string }>('/api/admin/algorithm/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  adminSimulateAlgorithm: (rounds: number, config: unknown) =>
+    request<unknown>('/api/admin/algorithm/simulate', {
+      method: 'POST',
+      body: JSON.stringify({ rounds, config }),
+    }),
 };
