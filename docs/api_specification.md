@@ -10,7 +10,7 @@
 3. [RESTful HTTP API 规范](#三-restful-http-api-规范)
    - [3.1 鉴权与用户基础模块](#31-鉴权与用户基础模块)
    - [3.2 个人资料与账本流水模块](#32-个人资料与账本流水模块)
-   - [3.3 房主/管理员后台专区 (`/api/admin`)](#33-房主管理员后台专区-apiadmin)
+   - [3.3 超级管理员后台专区 (`/api/admin`)](#33-超级管理员后台专区-apiadmin)
 4. [WebSocket (Socket.io) 实时对局协议规范](#四-websocket-socketio-实时对局协议规范)
    - [4.1 连接鉴权与生命周期](#41-连接鉴权与生命周期)
    - [4.2 房间与大厅信令 (Room & Lobby)](#42-房间与大厅信令-room--lobby)
@@ -184,7 +184,7 @@ interface ApiResponse<T = any> {
 
 ---
 
-### 3.3 房主/管理员后台专区 (`/api/admin`)
+### 3.3 超级管理员后台专区 (`/api/admin`)
 *提示：以下接口必须验证当前用户的 JWT 具备 `role: "admin"` 权限。*
 
 #### 1. 管理员开通新用户账号

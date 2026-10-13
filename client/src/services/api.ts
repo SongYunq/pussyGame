@@ -48,7 +48,7 @@ export const api = {
   getLedger: (page = 1, pageSize = 20) =>
     request<{ list: LedgerItem[]; total: number }>(`/api/user/ledger?page=${page}&pageSize=${pageSize}`),
 
-  // 房主/管理员专区
+  // 超级管理员专区
   adminCreateUser: (data: { username: string; password: string; nickname: string; avatar: string; initialChips: number; role?: 'player' | 'admin' }) =>
     request<{ id: number; username: string; balance: number }>('/api/admin/users', {
       method: 'POST',

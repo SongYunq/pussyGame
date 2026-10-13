@@ -461,7 +461,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
                 炸金花管理中枢平台
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
-                房主 / 超级管理
+                超级管理员
               </span>
             </div>
             <p className="text-[11px] text-slate-400">独立运维管理端 · 管理员专享模式</p>
