@@ -1,0 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Node modules & dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables
+.env
+.env.*.local
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Database & SQLite files
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+server/data/*.db
+!data/.gitkeep
+!server/data/.gitkeep
+
+# Coverage & testing
+coverage
+
+# Temporary & build artifacts
+.cache
+.temp
+tmp
