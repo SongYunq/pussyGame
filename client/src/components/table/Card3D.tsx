@@ -34,11 +34,29 @@ export const Card3D: React.FC<Card3DProps> = ({
   const rotZ = fanRotations[fanIndex] ?? 0;
   const transX = fanTranslates[fanIndex] ?? 0;
 
-  // 尺寸映射
-  const sizeClasses = {
-    sm: 'w-8 h-12 text-[10px]',
-    md: 'w-12 h-16 text-xs',
-    lg: 'w-16 h-22 text-sm',
+  // 尺寸响应式配置
+  const sizeConfig = {
+    sm: {
+      card: 'w-8 h-12',
+      rank: 'text-[10px]',
+      suit: 'text-[8px]',
+      watermark: 'text-base',
+      padding: 'p-0.5',
+    },
+    md: {
+      card: 'w-12 h-16',
+      rank: 'text-xs',
+      suit: 'text-[10px]',
+      watermark: 'text-2xl',
+      padding: 'p-1',
+    },
+    lg: {
+      card: 'w-16 h-24',
+      rank: 'text-sm',
+      suit: 'text-xs',
+      watermark: 'text-3xl',
+      padding: 'p-1.5',
+    },
   }[size];
 
   const suitInfo = card ? SUIT_SYMBOLS[card.suit] || { symbol: '♠', color: 'text-slate-900' } : null;
@@ -55,7 +73,7 @@ export const Card3D: React.FC<Card3DProps> = ({
       }}
     >
       <div
-        className={`relative ${sizeClasses} rounded-lg shadow-xl cursor-pointer transition-transform duration-700 ease-in-out`}
+        className={`relative ${sizeConfig.card} rounded-lg shadow-xl cursor-pointer transition-transform duration-700 ease-in-out`}
         style={{
           transformStyle: 'preserve-3d',
           transform: isRevealed && card ? 'rotateY(180deg)' : 'rotateY(0deg)',
@@ -63,17 +81,17 @@ export const Card3D: React.FC<Card3DProps> = ({
       >
         {/* 卡牌背面 (未看牌 / 他人手牌) */}
         <div
-          className="absolute inset-0 w-full h-full rounded-lg bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-900 border-2 border-amber-400/40 p-1 flex items-center justify-center backface-hidden shadow-md"
+          className={`absolute inset-0 w-full h-full rounded-lg bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-900 border border-amber-400/40 ${sizeConfig.padding} flex items-center justify-center backface-hidden shadow-md`}
           style={{ backfaceVisibility: 'hidden' }}
         >
           <div className="w-full h-full rounded border border-dashed border-amber-300/30 flex items-center justify-center bg-blue-950/60">
-            <span className="text-amber-400/70 font-black text-sm tracking-tighter">♠</span>
+            <span className="text-amber-400/70 font-black text-xs sm:text-sm tracking-tighter">♠</span>
           </div>
         </div>
 
         {/* 卡牌正面 (翻开后) */}
         <div
-          className="absolute inset-0 w-full h-full rounded-lg bg-slate-50 border-2 border-slate-300 p-1 flex flex-col justify-between shadow-lg"
+          className={`absolute inset-0 w-full h-full rounded-lg bg-slate-50 border border-slate-300/90 ${sizeConfig.padding} flex flex-col justify-between shadow-lg overflow-hidden`}
           style={{
             backfaceVisibility: 'hidden',
             transform: 'rotateY(180deg)',
@@ -82,20 +100,20 @@ export const Card3D: React.FC<Card3DProps> = ({
           {card && suitInfo && (
             <>
               {/* 左上角点数与花色 */}
-              <div className={`flex flex-col items-center leading-none ${suitInfo.color} font-bold`}>
-                <span className="font-extrabold">{rankLabel}</span>
-                <span className="text-[10px] scale-90">{suitInfo.symbol}</span>
+              <div className={`relative z-10 flex flex-col items-center leading-none ${suitInfo.color} font-bold self-start`}>
+                <span className={`font-extrabold tracking-tighter leading-none ${sizeConfig.rank}`}>{rankLabel}</span>
+                <span className={`leading-none mt-0.5 ${sizeConfig.suit}`}>{suitInfo.symbol}</span>
               </div>
 
               {/* 中央大花色水印 */}
-              <div className={`absolute inset-0 flex items-center justify-center ${suitInfo.color} opacity-85 pointer-events-none`}>
-                <span className="text-2xl font-black">{suitInfo.symbol}</span>
+              <div className={`absolute inset-0 flex items-center justify-center ${suitInfo.color} opacity-15 pointer-events-none select-none`}>
+                <span className={`font-black ${sizeConfig.watermark}`}>{suitInfo.symbol}</span>
               </div>
 
               {/* 右下角倒置点数与花色 */}
-              <div className={`flex flex-col items-center leading-none ${suitInfo.color} font-bold rotate-180 self-end`}>
-                <span className="font-extrabold">{rankLabel}</span>
-                <span className="text-[10px] scale-90">{suitInfo.symbol}</span>
+              <div className={`relative z-10 flex flex-col items-center leading-none ${suitInfo.color} font-bold rotate-180 self-end`}>
+                <span className={`font-extrabold tracking-tighter leading-none ${sizeConfig.rank}`}>{rankLabel}</span>
+                <span className={`leading-none mt-0.5 ${sizeConfig.suit}`}>{suitInfo.symbol}</span>
               </div>
             </>
           )}
