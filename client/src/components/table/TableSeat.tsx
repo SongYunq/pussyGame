@@ -92,13 +92,6 @@ export const TableSeat: React.FC<TableSeatProps> = ({
         )}
       </div>
 
-      {/* 自身牌型识别标签 */}
-      {isMe && seat.hasLooked && handEvaluation && (
-        <div className="mb-1 px-2 py-0.5 bg-gradient-to-r from-amber-600 to-yellow-500 text-slate-950 text-[10px] font-black rounded-full shadow-md border border-yellow-200 uppercase tracking-tight animate-fade-in">
-          {handEvaluation.name}
-        </div>
-      )}
-
       {/* 头像与外环轮廓 */}
       <div className="relative">
         <div
@@ -129,9 +122,16 @@ export const TableSeat: React.FC<TableSeatProps> = ({
           )}
         </div>
 
+        {/* 自身牌型识别标签 (置于头像右侧合适距离) */}
+        {isMe && seat.hasLooked && handEvaluation && (
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-30 whitespace-nowrap px-2.5 py-1 bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 text-slate-950 text-[10px] md:text-xs font-black rounded-full shadow-[0_4px_12px_rgba(245,158,11,0.4)] border border-yellow-200 uppercase tracking-tight animate-fade-in pointer-events-none flex items-center">
+            <span>{handEvaluation.name}</span>
+          </div>
+        )}
+
         {/* 已看牌角标 */}
         {seat.hasLooked && isAlive && (
-          <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[9px] px-1 py-0.2 rounded font-bold shadow border border-blue-300">
+          <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[9px] px-1 py-0.2 rounded font-bold shadow border border-blue-300 z-10">
             明注
           </span>
         )}
