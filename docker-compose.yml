@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  zjh-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zjh-game-server
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=zhajinhua-prod-secret-2026
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin123
+      - DB_PATH=/app/server/data/game.db
+      - CLIENT_DIST_PATH=../client/dist
+    volumes:
+      - ./server/data:/app/server/data
