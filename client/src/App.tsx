@@ -44,7 +44,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full bg-slate-950 font-sans antialiased text-slate-100">
+    <div className="h-full w-full bg-slate-950 font-sans antialiased text-slate-100 overflow-hidden flex flex-col">
       {currentView === 'login' && (
         <LoginView onLoginSuccess={handleLoginSuccess} />
       )}

@@ -448,9 +448,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col select-none font-sans">
+    <div className="h-full w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
       {/* 顶部全局管理导航栏 */}
-      <header className="relative z-30 w-full px-6 py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between shadow-2xl">
+      <header className="shrink-0 relative z-30 w-full px-6 py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]">
             <Shield className="w-5 h-5 font-black" />
@@ -532,7 +532,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
       </header>
 
       {/* 移动端快捷 Tab 切换 */}
-      <div className="flex md:hidden items-center justify-around bg-slate-900 px-2 py-2 border-b border-slate-800">
+      <div className="shrink-0 flex md:hidden items-center justify-around bg-slate-900 px-2 py-2 border-b border-slate-800">
         <button
           onClick={() => setActiveTab('accounts')}
           className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${
@@ -578,9 +578,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
         </div>
       )}
 
-      {/* 主体工作区容器 */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 overflow-y-auto">
-        {/* ======================= 系统 1: 账号管理系统 ======================= */}
+      {/* 主体工作区容器 (带全屏独立可滚动机制) */}
+      <main className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain">
+        <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 pb-24">
+          {/* ======================= 系统 1: 账号管理系统 ======================= */}
         {activeTab === 'accounts' && (
           <div className="flex flex-col gap-6 animate-fade-in">
             {/* 统计指标面板 */}
@@ -1413,6 +1414,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* ======================= 模态弹窗区 ======================= */}
