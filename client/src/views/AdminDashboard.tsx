@@ -333,12 +333,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       users.map((u) =>
         u.id === selectedUser.id
           ? {
-              ...u,
-              nickname: editNickname,
-              avatar: editAvatar,
-              role: editRole,
-              isBanned: editIsBanned,
-            }
+            ...u,
+            nickname: editNickname,
+            avatar: editAvatar,
+            role: editRole,
+            isBanned: editIsBanned,
+          }
           : u
       )
     );
@@ -456,13 +456,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-100 tracking-wide">
-                炸金花管理中枢平台
+                管理中枢平台
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
                 超级管理员
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">独立运维管理端 · 管理员专享模式</p>
+            <p className="text-[11px] text-slate-400">独立运维管理端</p>
           </div>
         </div>
 
@@ -470,33 +470,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         <div className="hidden md:flex items-center gap-1 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800">
           <button
             onClick={() => setActiveTab('accounts')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-              activeTab === 'accounts'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${activeTab === 'accounts'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
           >
             <Users className="w-4 h-4" />
             <span>账号管理系统</span>
           </button>
           <button
             onClick={() => setActiveTab('chips')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-              activeTab === 'chips'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${activeTab === 'chips'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
           >
             <Coins className="w-4 h-4" />
             <span>充值与资金系统</span>
           </button>
           <button
             onClick={() => setActiveTab('algorithm')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-              activeTab === 'algorithm'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${activeTab === 'algorithm'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
           >
             <Sliders className="w-4 h-4" />
             <span>发牌算法调控系统</span>
@@ -522,27 +519,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       <div className="shrink-0 flex md:hidden items-center justify-around bg-slate-900 px-2 py-2 border-b border-slate-800">
         <button
           onClick={() => setActiveTab('accounts')}
-          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${
-            activeTab === 'accounts' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-          }`}
+          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${activeTab === 'accounts' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
+            }`}
         >
           <Users className="w-3.5 h-3.5" />
           <span>账号</span>
         </button>
         <button
           onClick={() => setActiveTab('chips')}
-          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${
-            activeTab === 'chips' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-          }`}
+          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${activeTab === 'chips' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
+            }`}
         >
           <Coins className="w-3.5 h-3.5" />
           <span>充值</span>
         </button>
         <button
           onClick={() => setActiveTab('algorithm')}
-          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${
-            activeTab === 'algorithm' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
-          }`}
+          className={`flex items-center gap-1 text-xs py-1.5 px-3 rounded-lg font-bold ${activeTab === 'algorithm' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
+            }`}
         >
           <Sliders className="w-3.5 h-3.5" />
           <span>算法</span>
@@ -553,11 +547,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       {toastMsg && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce">
           <div
-            className={`px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border backdrop-blur-md ${
-              toastMsg.type === 'success'
-                ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50'
-                : 'bg-amber-950/90 text-amber-200 border-amber-500/50'
-            }`}
+            className={`px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border backdrop-blur-md ${toastMsg.type === 'success'
+              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50'
+              : 'bg-amber-950/90 text-amber-200 border-amber-500/50'
+              }`}
           >
             {toastMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
             <span>{toastMsg.text}</span>
@@ -569,838 +562,830 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       <main className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain">
         <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 pb-24">
           {/* ======================= 系统 1: 账号管理系统 ======================= */}
-        {activeTab === 'accounts' && (
-          <div className="flex flex-col gap-6 animate-fade-in">
-            {/* 统计指标面板 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-slate-400 font-bold">总在册玩家</span>
-                <span className="text-2xl font-black text-slate-100 mt-1 font-mono">{users.length}</span>
-                <span className="text-[10px] text-slate-500 mt-0.5">含超级管理员</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  实时在线
-                </span>
-                <span className="text-2xl font-black text-emerald-400 mt-1 font-mono">
-                  {users.filter((u) => u.isOnline).length}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">活跃于房间中</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-amber-400 font-bold">流通总筹码池</span>
-                <span className="text-2xl font-black text-amber-400 mt-1 font-mono">
-                  🪙 {totalCirculatingChips.toLocaleString()}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">全员账户余额总和</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-red-400 font-bold">封禁账号数</span>
-                <span className="text-2xl font-black text-red-400 mt-1 font-mono">
-                  {users.filter((u) => u.isBanned).length}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">已禁止登录游戏</span>
-              </div>
-            </div>
-
-            {/* 账号检索与创建工具栏 */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                {/* 搜索框 */}
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    placeholder="搜索账号 / 昵称..."
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-400"
-                  />
+          {activeTab === 'accounts' && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              {/* 统计指标面板 */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-slate-400 font-bold">总在册玩家</span>
+                  <span className="text-2xl font-black text-slate-100 mt-1 font-mono">{users.length}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">含超级管理员</span>
                 </div>
-
-                {/* 状态筛选 */}
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                  <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                      statusFilter === 'all' ? 'bg-slate-800 text-amber-400' : 'text-slate-400'
-                    }`}
-                  >
-                    全部
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('online')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                      statusFilter === 'online' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400'
-                    }`}
-                  >
-                    在线
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('offline')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                      statusFilter === 'offline' ? 'bg-slate-800 text-slate-300' : 'text-slate-400'
-                    }`}
-                  >
-                    离线
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('banned')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                      statusFilter === 'banned' ? 'bg-slate-800 text-red-400' : 'text-slate-400'
-                    }`}
-                  >
-                    已封禁
-                  </button>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    实时在线
+                  </span>
+                  <span className="text-2xl font-black text-emerald-400 mt-1 font-mono">
+                    {users.filter((u) => u.isOnline).length}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">活跃于房间中</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-amber-400 font-bold">流通总筹码池</span>
+                  <span className="text-2xl font-black text-amber-400 mt-1 font-mono">
+                    🪙 {totalCirculatingChips.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">全员账户余额总和</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-red-400 font-bold">封禁账号数</span>
+                  <span className="text-2xl font-black text-red-400 mt-1 font-mono">
+                    {users.filter((u) => u.isBanned).length}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">已禁止登录游戏</span>
                 </div>
               </div>
 
-              {/* 开通新账号按钮 */}
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>开通新账号</span>
-              </button>
-            </div>
+              {/* 账号检索与创建工具栏 */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                  {/* 搜索框 */}
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      placeholder="搜索账号 / 昵称..."
+                      className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-amber-400"
+                    />
+                  </div>
 
-            {/* 账号列表表格 */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-bold">
-                      <th className="py-3.5 px-4">账号信息</th>
-                      <th className="py-3.5 px-4">角色权限</th>
-                      <th className="py-3.5 px-4">筹码余额</th>
-                      <th className="py-3.5 px-4">当前状态</th>
-                      <th className="py-3.5 px-4">创建时间</th>
-                      <th className="py-3.5 px-4 text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {filteredUsers.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-500">
-                          没有找到符合条件的账号记录
-                        </td>
+                  {/* 状态筛选 */}
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${statusFilter === 'all' ? 'bg-slate-800 text-amber-400' : 'text-slate-400'
+                        }`}
+                    >
+                      全部
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('online')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${statusFilter === 'online' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400'
+                        }`}
+                    >
+                      在线
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('offline')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${statusFilter === 'offline' ? 'bg-slate-800 text-slate-300' : 'text-slate-400'
+                        }`}
+                    >
+                      离线
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('banned')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${statusFilter === 'banned' ? 'bg-slate-800 text-red-400' : 'text-slate-400'
+                        }`}
+                    >
+                      已封禁
+                    </button>
+                  </div>
+                </div>
+
+                {/* 开通新账号按钮 */}
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>开通新账号</span>
+                </button>
+              </div>
+
+              {/* 账号列表表格 */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-bold">
+                        <th className="py-3.5 px-4">账号信息</th>
+                        <th className="py-3.5 px-4">角色权限</th>
+                        <th className="py-3.5 px-4">筹码余额</th>
+                        <th className="py-3.5 px-4">当前状态</th>
+                        <th className="py-3.5 px-4">创建时间</th>
+                        <th className="py-3.5 px-4 text-right">操作</th>
                       </tr>
-                    ) : (
-                      filteredUsers.map((u) => (
-                        <tr key={u.id} className="hover:bg-slate-850/60 transition group">
-                          {/* 账号与昵称 */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-xl p-1 bg-slate-950 rounded-xl border border-slate-800">
-                                {u.avatar}
-                              </span>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-200 group-hover:text-amber-400 transition">
-                                  {u.nickname}
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-slate-500">
+                            没有找到符合条件的账号记录
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map((u) => (
+                          <tr key={u.id} className="hover:bg-slate-850/60 transition group">
+                            {/* 账号与昵称 */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-xl p-1 bg-slate-950 rounded-xl border border-slate-800">
+                                  {u.avatar}
                                 </span>
-                                <span className="font-mono text-[11px] text-slate-400">@{u.username}</span>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-200 group-hover:text-amber-400 transition">
+                                    {u.nickname}
+                                  </span>
+                                  <span className="font-mono text-[11px] text-slate-400">@{u.username}</span>
+                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* 角色 */}
-                          <td className="py-3.5 px-4">
-                            {u.role === 'admin' ? (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black border border-amber-500/30">
-                                管理员
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                普通玩家
-                              </span>
-                            )}
-                          </td>
+                            {/* 角色 */}
+                            <td className="py-3.5 px-4">
+                              {u.role === 'admin' ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black border border-amber-500/30">
+                                  管理员
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
+                                  普通玩家
+                                </span>
+                              )}
+                            </td>
 
-                          {/* 筹码 */}
-                          <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
-                            🪙 {u.balance.toLocaleString()}
-                          </td>
+                            {/* 筹码 */}
+                            <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                              🪙 {u.balance.toLocaleString()}
+                            </td>
 
-                          {/* 状态 */}
-                          <td className="py-3.5 px-4">
-                            {u.isBanned ? (
-                              <span className="px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 text-[10px] font-bold border border-red-500/30">
-                                已封禁
-                              </span>
-                            ) : u.isOnline ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-bold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                                在线 {u.currentRoomId ? `(房 ${u.currentRoomId})` : ''}
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 text-[11px]">离线</span>
-                            )}
-                          </td>
+                            {/* 状态 */}
+                            <td className="py-3.5 px-4">
+                              {u.isBanned ? (
+                                <span className="px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 text-[10px] font-bold border border-red-500/30">
+                                  已封禁
+                                </span>
+                              ) : u.isOnline ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-bold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                  在线 {u.currentRoomId ? `(房 ${u.currentRoomId})` : ''}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500 text-[11px]">离线</span>
+                              )}
+                            </td>
 
-                          {/* 创建时间 */}
-                          <td className="py-3.5 px-4 font-mono text-slate-500 text-[11px]">
-                            {u.createdAt}
-                          </td>
+                            {/* 创建时间 */}
+                            <td className="py-3.5 px-4 font-mono text-slate-500 text-[11px]">
+                              {u.createdAt}
+                            </td>
 
-                          {/* 动作按钮 */}
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="inline-flex items-center gap-1.5">
-                              {/* 快速充值 */}
-                              <button
-                                onClick={() => {
-                                  setRechargeTargetUserId(u.id);
-                                  setShowQuickRechargeModal(true);
-                                }}
-                                className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition"
-                                title="充减筹码"
-                              >
-                                <Coins className="w-3.5 h-3.5" />
-                              </button>
+                            {/* 动作按钮 */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="inline-flex items-center gap-1.5">
+                                {/* 快速充值 */}
+                                <button
+                                  onClick={() => {
+                                    setRechargeTargetUserId(u.id);
+                                    setShowQuickRechargeModal(true);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition"
+                                  title="充减筹码"
+                                >
+                                  <Coins className="w-3.5 h-3.5" />
+                                </button>
 
-                              {/* 改密 */}
-                              <button
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setShowPasswordModal(true);
-                                }}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                                title="修改密码"
-                              >
-                                <Key className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* 编辑资料 */}
-                              <button
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setEditNickname(u.nickname);
-                                  setEditAvatar(u.avatar);
-                                  setEditRole(u.role);
-                                  setEditIsBanned(u.isBanned);
-                                  setShowEditModal(true);
-                                }}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                                title="编辑资料与权限"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* 删除账号 (禁止删除主管理员) */}
-                              {u.username !== 'admin' && (
+                                {/* 改密 */}
                                 <button
                                   onClick={() => {
                                     setSelectedUser(u);
-                                    setShowDeleteModal(true);
+                                    setShowPasswordModal(true);
                                   }}
-                                  className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 transition"
-                                  title="删除账号"
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                                  title="修改密码"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Key className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+
+                                {/* 编辑资料 */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedUser(u);
+                                    setEditNickname(u.nickname);
+                                    setEditAvatar(u.avatar);
+                                    setEditRole(u.role);
+                                    setEditIsBanned(u.isBanned);
+                                    setShowEditModal(true);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                                  title="编辑资料与权限"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+
+                                {/* 删除账号 (禁止删除主管理员) */}
+                                {u.username !== 'admin' && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUser(u);
+                                      setShowDeleteModal(true);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 transition"
+                                    title="删除账号"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ======================= 系统 2: 充值与资金调配系统 ======================= */}
-        {activeTab === 'chips' && (
-          <div className="flex flex-col gap-6 animate-fade-in">
-            {/* 充值指标卡片 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-amber-400 font-bold flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  累计充值入金总额
-                </span>
-                <span className="text-2xl font-black text-amber-400 mt-1 font-mono">
-                  🪙 {totalRechargeSum.toLocaleString()}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">历史管理员人工充值流水累计</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                  <Activity className="w-4 h-4" />
-                  平台现存流通量
-                </span>
-                <span className="text-2xl font-black text-emerald-400 mt-1 font-mono">
-                  🪙 {totalCirculatingChips.toLocaleString()}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">所有在册账号钱包余量</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
-                <span className="text-xs text-blue-400 font-bold flex items-center gap-1">
-                  <CreditCard className="w-4 h-4" />
-                  调账审计流水笔数
-                </span>
-                <span className="text-2xl font-black text-blue-400 mt-1 font-mono">
-                  {chipLogs.length} 笔
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5">全纪录持久化留痕</span>
-              </div>
-            </div>
-
-            {/* 快速充值操作区 */}
-            <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-                    <Coins className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-slate-100">快速调配充值台</h3>
-                    <span className="text-[11px] text-slate-400">支持批量快捷面额增减与业务备注审计</span>
-                  </div>
+          {/* ======================= 系统 2: 充值与资金调配系统 ======================= */}
+          {activeTab === 'chips' && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              {/* 充值指标卡片 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-amber-400 font-bold flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4" />
+                    累计充值入金总额
+                  </span>
+                  <span className="text-2xl font-black text-amber-400 mt-1 font-mono">
+                    🪙 {totalRechargeSum.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">历史管理员人工充值流水累计</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                    <Activity className="w-4 h-4" />
+                    平台现存流通量
+                  </span>
+                  <span className="text-2xl font-black text-emerald-400 mt-1 font-mono">
+                    🪙 {totalCirculatingChips.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">所有在册账号钱包余量</span>
+                </div>
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col">
+                  <span className="text-xs text-blue-400 font-bold flex items-center gap-1">
+                    <CreditCard className="w-4 h-4" />
+                    调账审计流水笔数
+                  </span>
+                  <span className="text-2xl font-black text-blue-400 mt-1 font-mono">
+                    {chipLogs.length} 笔
+                  </span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">全纪录持久化留痕</span>
                 </div>
               </div>
 
-              <form onSubmit={handleExecuteRecharge} className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* 选择目标账号 */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5">目标玩家账号</label>
-                  <select
-                    value={rechargeTargetUserId}
-                    onChange={(e) => setRechargeTargetUserId(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 outline-none focus:border-amber-400"
-                  >
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.nickname} (@{u.username}) - 当前: {u.balance.toLocaleString()}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 调配模式 */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5">调配方向</label>
+              {/* 快速充值操作区 */}
+              <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRechargeType('recharge')}
-                      className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
-                        rechargeType === 'recharge'
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-100">快速调配充值台</h3>
+                      <span className="text-[11px] text-slate-400">支持批量快捷面额增减与业务备注审计</span>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleExecuteRecharge} className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 选择目标账号 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1.5">目标玩家账号</label>
+                    <select
+                      value={rechargeTargetUserId}
+                      onChange={(e) => setRechargeTargetUserId(Number(e.target.value))}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 outline-none focus:border-amber-400"
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nickname} (@{u.username}) - 当前: {u.balance.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 调配模式 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1.5">调配方向</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRechargeType('recharge')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-black transition ${rechargeType === 'recharge'
                           ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                           : 'bg-slate-950 text-slate-400 border border-slate-800'
-                      }`}
-                    >
-                      + 充值增币
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRechargeType('deduct')}
-                      className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
-                        rechargeType === 'deduct'
+                          }`}
+                      >
+                        + 充值增币
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRechargeType('deduct')}
+                        className={`flex-1 py-2 rounded-xl text-xs font-black transition ${rechargeType === 'deduct'
                           ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
                           : 'bg-slate-950 text-slate-400 border border-slate-800'
-                      }`}
+                          }`}
+                      >
+                        - 核算扣减
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 数额输入 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1.5">变动数额</label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={rechargeAmount}
+                      onChange={(e) => setRechargeAmount(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-amber-400 outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  {/* 快捷面额按钮 */}
+                  <div className="md:col-span-3 flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[11px] text-slate-400 font-bold">快捷面额：</span>
+                    {[1000, 5000, 10000, 50000, 100000, 500000].map((amt) => (
+                      <button
+                        type="button"
+                        key={amt}
+                        onClick={() => setRechargeAmount(amt)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-700/80 text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 transition"
+                      >
+                        +{amt.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 业务备注与提交 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-400 mb-1.5">业务备注 / 审计原因</label>
+                    <input
+                      type="text"
+                      required
+                      value={rechargeReason}
+                      onChange={(e) => setRechargeReason(e.target.value)}
+                      placeholder="如: 老友微信转账线下结算..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div className="md:col-span-1 flex items-end">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition"
                     >
-                      - 核算扣减
+                      确认立即执行生效
                     </button>
                   </div>
-                </div>
+                </form>
+              </div>
 
-                {/* 数额输入 */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5">变动数额</label>
-                  <input
-                    type="number"
-                    min={1}
-                    required
-                    value={rechargeAmount}
-                    onChange={(e) => setRechargeAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-mono font-bold text-amber-400 outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                {/* 快捷面额按钮 */}
-                <div className="md:col-span-3 flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-[11px] text-slate-400 font-bold">快捷面额：</span>
-                  {[1000, 5000, 10000, 50000, 100000, 500000].map((amt) => (
-                    <button
-                      type="button"
-                      key={amt}
-                      onClick={() => setRechargeAmount(amt)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-700/80 text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 transition"
-                    >
-                      +{amt.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 业务备注与提交 */}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-400 mb-1.5">业务备注 / 审计原因</label>
+              {/* 充值流水审计列表 */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400">调账与充值流水日志 ({chipLogs.length})</span>
                   <input
                     type="text"
-                    required
-                    value={rechargeReason}
-                    onChange={(e) => setRechargeReason(e.target.value)}
-                    placeholder="如: 老友微信转账线下结算..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 outline-none focus:border-amber-400"
+                    placeholder="按账号筛选流水..."
+                    value={chipLogSearch}
+                    onChange={(e) => setChipLogSearch(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-200 outline-none"
                   />
                 </div>
 
-                <div className="md:col-span-1 flex items-end">
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition"
-                  >
-                    确认立即执行生效
-                  </button>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-bold">
+                        <th className="py-3 px-4">流水单号</th>
+                        <th className="py-3 px-4">目标账号</th>
+                        <th className="py-3 px-4">类型</th>
+                        <th className="py-3 px-4">变动数额</th>
+                        <th className="py-3 px-4">变动后余额</th>
+                        <th className="py-3 px-4">审计备注</th>
+                        <th className="py-3 px-4">操作管理员</th>
+                        <th className="py-3 px-4 text-right">时间</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {chipLogs
+                        .filter((log) => !chipLogSearch || log.username.toLowerCase().includes(chipLogSearch.toLowerCase()))
+                        .map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-850/50 transition">
+                            <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">#{log.id}</td>
+                            <td className="py-3 px-4 font-bold text-slate-200">@{log.username}</td>
+                            <td className="py-3 px-4">
+                              {log.type === 'recharge' ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                                  充值入账
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-500/20 text-[10px] font-bold">
+                                  核算扣除
+                                </span>
+                              )}
+                            </td>
+                            <td className={`py-3 px-4 font-mono font-bold ${log.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {log.amount >= 0 ? `+${log.amount.toLocaleString()}` : log.amount.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-bold text-amber-400">
+                              🪙 {log.balanceAfter.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-slate-300 max-w-xs truncate">{log.reason}</td>
+                            <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{log.operator}</td>
+                            <td className="py-3 px-4 text-right text-slate-500 font-mono text-[11px]">{log.createdAt}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
-              </form>
-            </div>
-
-            {/* 充值流水审计列表 */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400">调账与充值流水日志 ({chipLogs.length})</span>
-                <input
-                  type="text"
-                  placeholder="按账号筛选流水..."
-                  value={chipLogSearch}
-                  onChange={(e) => setChipLogSearch(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-200 outline-none"
-                />
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-bold">
-                      <th className="py-3 px-4">流水单号</th>
-                      <th className="py-3 px-4">目标账号</th>
-                      <th className="py-3 px-4">类型</th>
-                      <th className="py-3 px-4">变动数额</th>
-                      <th className="py-3 px-4">变动后余额</th>
-                      <th className="py-3 px-4">审计备注</th>
-                      <th className="py-3 px-4">操作管理员</th>
-                      <th className="py-3 px-4 text-right">时间</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {chipLogs
-                      .filter((log) => !chipLogSearch || log.username.toLowerCase().includes(chipLogSearch.toLowerCase()))
-                      .map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-850/50 transition">
-                          <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">#{log.id}</td>
-                          <td className="py-3 px-4 font-bold text-slate-200">@{log.username}</td>
-                          <td className="py-3 px-4">
-                            {log.type === 'recharge' ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
-                                充值入账
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-500/20 text-[10px] font-bold">
-                                核算扣除
-                              </span>
-                            )}
-                          </td>
-                          <td className={`py-3 px-4 font-mono font-bold ${log.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {log.amount >= 0 ? `+${log.amount.toLocaleString()}` : log.amount.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-amber-400">
-                            🪙 {log.balanceAfter.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 text-slate-300 max-w-xs truncate">{log.reason}</td>
-                          <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">{log.operator}</td>
-                          <td className="py-3 px-4 text-right text-slate-500 font-mono text-[11px]">{log.createdAt}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ======================= 系统 3: 发牌算法调控系统 ======================= */}
-        {activeTab === 'algorithm' && (
-          <div className="flex flex-col gap-6 animate-fade-in">
-            {/* 模式选择预设卡片 */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-                <div>
-                  <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
-                    <Sliders className="w-5 h-5 text-amber-400" />
-                    <span>发牌风控与概率核心模式</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    系统默认基于 52 张真随机洗牌。可根据运营需求快速选用激战预设或深度自定义调节。
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleResetAlgorithmConfig}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>恢复官方默认平衡</span>
-                  </button>
-                  <button
-                    onClick={handleSaveAlgorithmConfig}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>保存并应用生效</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 预设模式快捷选框 */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 mt-5">
-                {[
-                  {
-                    id: 'fair',
-                    title: '官方绝对公平模式',
-                    desc: '52 张扑克真随机洗牌，数学期望自然概率，适合正规竞技',
-                    badge: '标准自然概率',
-                  },
-                  {
-                    id: 'action_boost',
-                    title: '刺激激战碰撞模式',
-                    desc: '提高金花、顺金与豹子碰面频率，大幅增加弃牌与加注博弈',
-                    badge: '大牌频出 · 筹码池大',
-                  },
-                  {
-                    id: 'beginner_favor',
-                    title: '新人留存护航模式',
-                    desc: '对局自动平衡胜负方落差，避免新手连续拿到极小散牌',
-                    badge: '新手留存保障',
-                  },
-                  {
-                    id: 'custom',
-                    title: '高级深度自定义',
-                    desc: '手动微调每项牌型的生成加权、特殊235以及强强碰撞率',
-                    badge: '自由调节',
-                  },
-                ].map((modeItem) => (
-                  <div
-                    key={modeItem.id}
-                    onClick={() => {
-                      if (modeItem.id === 'fair') {
-                        setAlgoConfig(DEFAULT_ALGORITHM_CONFIG);
-                      } else if (modeItem.id === 'action_boost') {
-                        setAlgoConfig({
-                          ...algoConfig,
-                          mode: 'action_boost',
-                          leopardWeight: 2.2,
-                          straightFlushWeight: 2.0,
-                          flushWeight: 1.8,
-                          straightWeight: 1.5,
-                          pairWeight: 1.0,
-                          highCardWeight: 0.8,
-                          clashRate: 50,
-                          special235Boost: 2.5,
-                        });
-                      } else if (modeItem.id === 'beginner_favor') {
-                        setAlgoConfig({
-                          ...algoConfig,
-                          mode: 'beginner_favor',
-                          leopardWeight: 1.2,
-                          straightFlushWeight: 1.2,
-                          flushWeight: 1.4,
-                          straightWeight: 1.3,
-                          pairWeight: 1.2,
-                          highCardWeight: 0.9,
-                          clashRate: 30,
-                          special235Boost: 1.2,
-                        });
-                      } else {
-                        setAlgoConfig({ ...algoConfig, mode: 'custom' });
-                      }
-                    }}
-                    className={`p-4 rounded-2xl cursor-pointer border transition-all flex flex-col justify-between ${
-                      algoConfig.mode === modeItem.id
-                        ? 'bg-amber-500/10 border-amber-500 text-amber-200 shadow-lg shadow-amber-500/10'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-sm text-slate-100">{modeItem.title}</span>
-                        {algoConfig.mode === modeItem.id && (
-                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{modeItem.desc}</p>
-                    </div>
-                    <span className="mt-3 text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-bold self-start text-amber-400">
-                      {modeItem.badge}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 牌型出牌权重微调滑块 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* 各牌型概率权重调整 */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
-                <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
-                  <Percent className="w-4 h-4 text-amber-400" />
-                  <span>牌型概率生成加权系数 (0.1x ~ 5.0x)</span>
-                </h4>
-                <p className="text-[11px] text-slate-400">
-                  大于 1.0 表示在自然概率基础上放大出现几率；小于 1.0 表示压制出现率。
-                </p>
-
-                <div className="flex flex-col gap-3.5 mt-2 text-xs">
-                  {/* 豹子 */}
+          {/* ======================= 系统 3: 发牌算法调控系统 ======================= */}
+          {activeTab === 'algorithm' && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              {/* 模式选择预设卡片 */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
                   <div>
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-amber-400">豹子权重 (Leopard)</span>
-                      <span className="font-mono text-slate-300">{algoConfig.leopardWeight.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={5.0}
-                      step={0.1}
-                      value={algoConfig.leopardWeight}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', leopardWeight: Number(e.target.value) })}
-                      className="w-full accent-amber-500 cursor-pointer"
-                    />
+                    <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
+                      <Sliders className="w-5 h-5 text-amber-400" />
+                      <span>发牌风控与概率核心模式</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      系统默认基于 52 张真随机洗牌。可根据运营需求快速选用激战预设或深度自定义调节。
+                    </p>
                   </div>
 
-                  {/* 顺金 */}
-                  <div>
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-purple-400">顺金 (同花顺) 权重</span>
-                      <span className="font-mono text-slate-300">{algoConfig.straightFlushWeight.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={5.0}
-                      step={0.1}
-                      value={algoConfig.straightFlushWeight}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightFlushWeight: Number(e.target.value) })}
-                      className="w-full accent-purple-500 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* 金花 */}
-                  <div>
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-blue-400">金花 (同花) 权重</span>
-                      <span className="font-mono text-slate-300">{algoConfig.flushWeight.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={4.0}
-                      step={0.1}
-                      value={algoConfig.flushWeight}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', flushWeight: Number(e.target.value) })}
-                      className="w-full accent-blue-500 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* 顺子 */}
-                  <div>
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-emerald-400">顺子权重 (Straight)</span>
-                      <span className="font-mono text-slate-300">{algoConfig.straightWeight.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={3.0}
-                      step={0.1}
-                      value={algoConfig.straightWeight}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightWeight: Number(e.target.value) })}
-                      className="w-full accent-emerald-500 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* 对子 */}
-                  <div>
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-slate-300">对子权重 (Pair)</span>
-                      <span className="font-mono text-slate-300">{algoConfig.pairWeight.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={2.0}
-                      step={0.1}
-                      value={algoConfig.pairWeight}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', pairWeight: Number(e.target.value) })}
-                      className="w-full accent-slate-400 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* 强强碰撞率 */}
-                  <div className="pt-2 border-t border-slate-800">
-                    <div className="flex justify-between font-bold mb-1">
-                      <span className="text-red-400">强强对决碰撞率 (Showdown Clash)</span>
-                      <span className="font-mono text-slate-300">{algoConfig.clashRate}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={algoConfig.clashRate}
-                      onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', clashRate: Number(e.target.value) })}
-                      className="w-full accent-red-500 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-500">控制多位玩家同局拿到金花及以上大牌火拼的频次</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 蒙特卡洛算法模拟测试机 */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div>
-                      <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-emerald-400" />
-                        <span>蒙特卡洛发牌算法仿真验证机</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        在上线前预先模拟海量牌局，验证当前概率分布是否合理稳健
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {[1000, 5000].map((rounds) => (
-                        <button
-                          key={rounds}
-                          onClick={() => setSimRounds(rounds)}
-                          className={`px-2 py-1 rounded-lg text-xs font-mono font-bold ${
-                            simRounds === rounds ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {rounds}局
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-center">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={handleRunSimulation}
-                      disabled={isSimulating}
-                      className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-2"
+                      onClick={handleResetAlgorithmConfig}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition flex items-center gap-1.5"
                     >
-                      <Play className="w-4 h-4 fill-slate-950" />
-                      <span>{isSimulating ? '正在执行模拟发牌计算...' : `立即模拟发牌 ${simRounds.toLocaleString()} 局`}</span>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>恢复官方默认平衡</span>
+                    </button>
+                    <button
+                      onClick={handleSaveAlgorithmConfig}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>保存并应用生效</span>
                     </button>
                   </div>
-
-                  {/* 模拟结果数据展示 */}
-                  {simResults && (
-                    <div className="mt-5 flex flex-col gap-2.5 text-xs animate-fade-in">
-                      <div className="text-[11px] font-bold text-slate-400 flex justify-between">
-                        <span>牌型分布测算结果</span>
-                        <span>共 {simResults.totalRounds.toLocaleString()} 局</span>
-                      </div>
-
-                      {/* 豹子 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-amber-400">豹子 (AAA 等)</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.leopard.count} 次 ({simResults.leopard.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, simResults.leopard.pct * 10)}%` }} />
-                        </div>
-                      </div>
-
-                      {/* 顺金 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-purple-400">顺金 (同花顺)</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.straightFlush.count} 次 ({simResults.straightFlush.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-purple-400 h-full" style={{ width: `${Math.min(100, simResults.straightFlush.pct * 10)}%` }} />
-                        </div>
-                      </div>
-
-                      {/* 金花 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-blue-400">金花 (同花)</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.flush.count} 次 ({simResults.flush.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-blue-400 h-full" style={{ width: `${Math.min(100, simResults.flush.pct * 4)}%` }} />
-                        </div>
-                      </div>
-
-                      {/* 顺子 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-emerald-400">顺子</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.straight.count} 次 ({simResults.straight.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-emerald-400 h-full" style={{ width: `${Math.min(100, simResults.straight.pct * 4)}%` }} />
-                        </div>
-                      </div>
-
-                      {/* 对子 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-slate-300">对子</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.pair.count} 次 ({simResults.pair.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-slate-400 h-full" style={{ width: `${Math.min(100, simResults.pair.pct * 2)}%` }} />
-                        </div>
-                      </div>
-
-                      {/* 散牌 */}
-                      <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                        <div className="flex justify-between text-[11px] mb-1 font-bold">
-                          <span className="text-slate-400">单张散牌</span>
-                          <span className="font-mono text-slate-200">
-                            {simResults.highCard.count} 次 ({simResults.highCard.pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-slate-600 h-full" style={{ width: `${Math.min(100, simResults.highCard.pct)}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
-                  <span>
-                    提示：当前发牌算法调控前端已与本地 Mock 引擎全量接通，保存后即刻在客户端本地生效；服务端 API 接入后将无缝直通生产环境。
-                  </span>
+                {/* 预设模式快捷选框 */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 mt-5">
+                  {[
+                    {
+                      id: 'fair',
+                      title: '官方绝对公平模式',
+                      desc: '52 张扑克真随机洗牌，数学期望自然概率，适合正规竞技',
+                      badge: '标准自然概率',
+                    },
+                    {
+                      id: 'action_boost',
+                      title: '刺激激战碰撞模式',
+                      desc: '提高金花、顺金与豹子碰面频率，大幅增加弃牌与加注博弈',
+                      badge: '大牌频出 · 筹码池大',
+                    },
+                    {
+                      id: 'beginner_favor',
+                      title: '新人留存护航模式',
+                      desc: '对局自动平衡胜负方落差，避免新手连续拿到极小散牌',
+                      badge: '新手留存保障',
+                    },
+                    {
+                      id: 'custom',
+                      title: '高级深度自定义',
+                      desc: '手动微调每项牌型的生成加权、特殊235以及强强碰撞率',
+                      badge: '自由调节',
+                    },
+                  ].map((modeItem) => (
+                    <div
+                      key={modeItem.id}
+                      onClick={() => {
+                        if (modeItem.id === 'fair') {
+                          setAlgoConfig(DEFAULT_ALGORITHM_CONFIG);
+                        } else if (modeItem.id === 'action_boost') {
+                          setAlgoConfig({
+                            ...algoConfig,
+                            mode: 'action_boost',
+                            leopardWeight: 2.2,
+                            straightFlushWeight: 2.0,
+                            flushWeight: 1.8,
+                            straightWeight: 1.5,
+                            pairWeight: 1.0,
+                            highCardWeight: 0.8,
+                            clashRate: 50,
+                            special235Boost: 2.5,
+                          });
+                        } else if (modeItem.id === 'beginner_favor') {
+                          setAlgoConfig({
+                            ...algoConfig,
+                            mode: 'beginner_favor',
+                            leopardWeight: 1.2,
+                            straightFlushWeight: 1.2,
+                            flushWeight: 1.4,
+                            straightWeight: 1.3,
+                            pairWeight: 1.2,
+                            highCardWeight: 0.9,
+                            clashRate: 30,
+                            special235Boost: 1.2,
+                          });
+                        } else {
+                          setAlgoConfig({ ...algoConfig, mode: 'custom' });
+                        }
+                      }}
+                      className={`p-4 rounded-2xl cursor-pointer border transition-all flex flex-col justify-between ${algoConfig.mode === modeItem.id
+                        ? 'bg-amber-500/10 border-amber-500 text-amber-200 shadow-lg shadow-amber-500/10'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-sm text-slate-100">{modeItem.title}</span>
+                          {algoConfig.mode === modeItem.id && (
+                            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{modeItem.desc}</p>
+                      </div>
+                      <span className="mt-3 text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-bold self-start text-amber-400">
+                        {modeItem.badge}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 牌型出牌权重微调滑块 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 各牌型概率权重调整 */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+                  <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
+                    <Percent className="w-4 h-4 text-amber-400" />
+                    <span>牌型概率生成加权系数 (0.1x ~ 5.0x)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    大于 1.0 表示在自然概率基础上放大出现几率；小于 1.0 表示压制出现率。
+                  </p>
+
+                  <div className="flex flex-col gap-3.5 mt-2 text-xs">
+                    {/* 豹子 */}
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-amber-400">豹子权重 (Leopard)</span>
+                        <span className="font-mono text-slate-300">{algoConfig.leopardWeight.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={5.0}
+                        step={0.1}
+                        value={algoConfig.leopardWeight}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', leopardWeight: Number(e.target.value) })}
+                        className="w-full accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 顺金 */}
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-purple-400">顺金 (同花顺) 权重</span>
+                        <span className="font-mono text-slate-300">{algoConfig.straightFlushWeight.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={5.0}
+                        step={0.1}
+                        value={algoConfig.straightFlushWeight}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightFlushWeight: Number(e.target.value) })}
+                        className="w-full accent-purple-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 金花 */}
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-blue-400">金花 (同花) 权重</span>
+                        <span className="font-mono text-slate-300">{algoConfig.flushWeight.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={4.0}
+                        step={0.1}
+                        value={algoConfig.flushWeight}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', flushWeight: Number(e.target.value) })}
+                        className="w-full accent-blue-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 顺子 */}
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-emerald-400">顺子权重 (Straight)</span>
+                        <span className="font-mono text-slate-300">{algoConfig.straightWeight.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={3.0}
+                        step={0.1}
+                        value={algoConfig.straightWeight}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightWeight: Number(e.target.value) })}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 对子 */}
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-slate-300">对子权重 (Pair)</span>
+                        <span className="font-mono text-slate-300">{algoConfig.pairWeight.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={2.0}
+                        step={0.1}
+                        value={algoConfig.pairWeight}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', pairWeight: Number(e.target.value) })}
+                        className="w-full accent-slate-400 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* 强强碰撞率 */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-red-400">强强对决碰撞率 (Showdown Clash)</span>
+                        <span className="font-mono text-slate-300">{algoConfig.clashRate}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={algoConfig.clashRate}
+                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', clashRate: Number(e.target.value) })}
+                        className="w-full accent-red-500 cursor-pointer"
+                      />
+                      <span className="text-[10px] text-slate-500">控制多位玩家同局拿到金花及以上大牌火拼的频次</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 蒙特卡洛算法模拟测试机 */}
+                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-emerald-400" />
+                          <span>蒙特卡洛发牌算法仿真验证机</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          在上线前预先模拟海量牌局，验证当前概率分布是否合理稳健
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {[1000, 5000].map((rounds) => (
+                          <button
+                            key={rounds}
+                            onClick={() => setSimRounds(rounds)}
+                            className={`px-2 py-1 rounded-lg text-xs font-mono font-bold ${simRounds === rounds ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                              }`}
+                          >
+                            {rounds}局
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-center">
+                      <button
+                        onClick={handleRunSimulation}
+                        disabled={isSimulating}
+                        className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-2"
+                      >
+                        <Play className="w-4 h-4 fill-slate-950" />
+                        <span>{isSimulating ? '正在执行模拟发牌计算...' : `立即模拟发牌 ${simRounds.toLocaleString()} 局`}</span>
+                      </button>
+                    </div>
+
+                    {/* 模拟结果数据展示 */}
+                    {simResults && (
+                      <div className="mt-5 flex flex-col gap-2.5 text-xs animate-fade-in">
+                        <div className="text-[11px] font-bold text-slate-400 flex justify-between">
+                          <span>牌型分布测算结果</span>
+                          <span>共 {simResults.totalRounds.toLocaleString()} 局</span>
+                        </div>
+
+                        {/* 豹子 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-amber-400">豹子 (AAA 等)</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.leopard.count} 次 ({simResults.leopard.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, simResults.leopard.pct * 10)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 顺金 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-purple-400">顺金 (同花顺)</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.straightFlush.count} 次 ({simResults.straightFlush.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-purple-400 h-full" style={{ width: `${Math.min(100, simResults.straightFlush.pct * 10)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 金花 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-blue-400">金花 (同花)</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.flush.count} 次 ({simResults.flush.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-blue-400 h-full" style={{ width: `${Math.min(100, simResults.flush.pct * 4)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 顺子 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-emerald-400">顺子</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.straight.count} 次 ({simResults.straight.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-emerald-400 h-full" style={{ width: `${Math.min(100, simResults.straight.pct * 4)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 对子 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-slate-300">对子</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.pair.count} 次 ({simResults.pair.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-slate-400 h-full" style={{ width: `${Math.min(100, simResults.pair.pct * 2)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* 散牌 */}
+                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                          <div className="flex justify-between text-[11px] mb-1 font-bold">
+                            <span className="text-slate-400">单张散牌</span>
+                            <span className="font-mono text-slate-200">
+                              {simResults.highCard.count} 次 ({simResults.highCard.pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-slate-600 h-full" style={{ width: `${Math.min(100, simResults.highCard.pct)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>
+                      提示：当前发牌算法调控前端已与本地 Mock 引擎全量接通，保存后即刻在客户端本地生效；服务端 API 接入后将无缝直通生产环境。
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </main>
 
@@ -1464,11 +1449,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       type="button"
                       key={av}
                       onClick={() => setNewAvatar(av)}
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center text-base border transition ${
-                        newAvatar === av
-                          ? 'border-amber-400 bg-amber-500/20 scale-110 shadow-md'
-                          : 'border-slate-800 bg-slate-950 hover:bg-slate-800'
-                      }`}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center text-base border transition ${newAvatar === av
+                        ? 'border-amber-400 bg-amber-500/20 scale-110 shadow-md'
+                        : 'border-slate-800 bg-slate-950 hover:bg-slate-800'
+                        }`}
                     >
                       {av}
                     </button>
@@ -1632,9 +1616,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       type="button"
                       key={av}
                       onClick={() => setEditAvatar(av)}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm border transition ${
-                        editAvatar === av ? 'border-amber-400 bg-amber-500/20 scale-105' : 'border-slate-800 bg-slate-950'
-                      }`}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm border transition ${editAvatar === av ? 'border-amber-400 bg-amber-500/20 scale-105' : 'border-slate-800 bg-slate-950'
+                        }`}
                     >
                       {av}
                     </button>
@@ -1711,18 +1694,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setRechargeType('recharge')}
-                    className={`flex-1 py-1.5 rounded-xl font-bold transition ${
-                      rechargeType === 'recharge' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
-                    }`}
+                    className={`flex-1 py-1.5 rounded-xl font-bold transition ${rechargeType === 'recharge' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                      }`}
                   >
                     充值入币
                   </button>
                   <button
                     type="button"
                     onClick={() => setRechargeType('deduct')}
-                    className={`flex-1 py-1.5 rounded-xl font-bold transition ${
-                      rechargeType === 'deduct' ? 'bg-red-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
-                    }`}
+                    className={`flex-1 py-1.5 rounded-xl font-bold transition ${rechargeType === 'deduct' ? 'bg-red-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                      }`}
                   >
                     核算扣除
                   </button>
