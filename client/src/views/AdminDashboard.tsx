@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Play,
-  Eye,
   Sparkles,
   TrendingUp,
   Activity,
@@ -29,7 +28,6 @@ import {
 
 interface AdminDashboardProps {
   onLogout?: () => void;
-  onPreviewTable?: () => void;
 }
 
 export interface AdminUser {
@@ -100,7 +98,7 @@ const INITIAL_CHIP_LOGS: ChipAuditLog[] = [
 
 const AVATAR_OPTIONS = ['👑', '🦁', '🦊', '🐯', '🐼', '🦅', '🐉', '👤', '🎩', '💎', '🚀', '🔥'];
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPreviewTable }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const { user: currentAdmin } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'accounts' | 'chips' | 'algorithm'>('accounts');
 
@@ -505,19 +503,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, onPrev
           </button>
         </div>
 
-        {/* 右侧操作区：预览牌桌 / 退出登录 */}
+        {/* 右侧操作区：退出登录 */}
         <div className="flex items-center gap-2.5">
-          {onPreviewTable && (
-            <button
-              onClick={onPreviewTable}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition border border-slate-700"
-              title="以旁观视角查看游戏牌桌"
-            >
-              <Eye className="w-4 h-4 text-amber-400" />
-              <span>牌桌视角</span>
-            </button>
-          )}
-
           {onLogout && (
             <button
               onClick={onLogout}

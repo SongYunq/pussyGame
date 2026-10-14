@@ -18,9 +18,9 @@ export const App: React.FC = () => {
   });
   const [isLedgerOpen, setIsLedgerOpen] = useState(false);
 
-  // 管理员账号强制进入管理中枢，管理员不打牌
+  // 超级管理员账号纯管理系统运作，完全隔离牌桌与大厅
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin' && (currentView === 'table' || currentView === 'lobby')) {
+    if (isAuthenticated && user?.role === 'admin' && currentView !== 'admin') {
       setCurrentView('admin');
     }
   }, [isAuthenticated, user, currentView]);
@@ -61,14 +61,12 @@ export const App: React.FC = () => {
         <TableView
           onBackToLobby={() => setCurrentView('lobby')}
           onOpenLedger={() => setIsLedgerOpen(true)}
-          onOpenAdmin={() => setCurrentView('admin')}
         />
       )}
 
       {currentView === 'admin' && (
         <AdminDashboard
           onLogout={handleLogout}
-          onPreviewTable={() => setCurrentView('table')}
         />
       )}
 

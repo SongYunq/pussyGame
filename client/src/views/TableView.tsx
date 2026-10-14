@@ -7,18 +7,16 @@ import { AllInEpicEffect } from '../components/animations/AllInEpicEffect';
 import { GoldStreamer } from '../components/animations/GoldStreamer';
 import { SettlementModal } from '../components/animations/SettlementModal';
 import { DevToolBar } from '../components/dev/DevToolBar';
-import { Volume2, VolumeX, LogOut, Shield, FileText } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, FileText } from 'lucide-react';
 
 interface TableViewProps {
   onBackToLobby?: () => void;
   onOpenLedger?: () => void;
-  onOpenAdmin?: () => void;
 }
 
 export const TableView: React.FC<TableViewProps> = ({
   onBackToLobby,
   onOpenLedger,
-  onOpenAdmin,
 }) => {
   const {
     roomState,
@@ -88,18 +86,6 @@ export const TableView: React.FC<TableViewProps> = ({
             >
               <FileText className="w-4 h-4 text-emerald-400" />
               <span className="hidden md:inline">账本</span>
-            </button>
-          )}
-
-          {/* 管理员专区 */}
-          {currentUser.role === 'admin' && onOpenAdmin && (
-            <button
-              onClick={onOpenAdmin}
-              className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition flex items-center gap-1 text-xs border border-amber-500/30"
-              title="管理后台"
-            >
-              <Shield className="w-4 h-4" />
-              <span className="hidden md:inline">后台</span>
             </button>
           )}
 
