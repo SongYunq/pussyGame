@@ -31,14 +31,14 @@ function getPlayerChipZoneCoords(
   const row = Math.floor(stackIndex / 5); // 0: 主排, 1: 靠中心前排, 2: 靠玩家后排
   const col = colOrder[stackIndex % 5] ?? 0;
 
-  // 径向距离（距离中心 50%,50% 的椭圆半轴百分比）：既向中间推进，又明显靠近加注玩家一侧
-  const rowRadiusOffsets = [0, -3.2, 2.8];
+  // 径向距离（距离中心 50%,50% 的椭圆半轴百分比）：自己面前的筹码排数向中心推进，避免往回压住底部的手牌
+  const rowRadiusOffsets = seatPos.isMe ? [0, -2.6, -5.2] : [0, -3.2, 2.8];
   const rOffset = rowRadiusOffsets[row] ?? 0;
   // 偶数列轻微前后错落 0.5%，营造真实赌场推码的层次感
   const stagger = Math.abs(col) % 2 === 1 ? -0.55 : 0;
 
-  const baseRx = seatPos.isMe ? 15.2 : 19.8;
-  const baseRy = seatPos.isMe ? 13.2 : 15.8;
+  const baseRx = seatPos.isMe ? 13.8 : 19.8;
+  const baseRy = seatPos.isMe ? 11.8 : 15.8;
   const radialRx = baseRx + rOffset + stagger;
   const radialRy = baseRy + rOffset * 0.82 + stagger;
 
