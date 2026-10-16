@@ -138,22 +138,30 @@ export const DevToolBar: React.FC = () => {
             </button>
           </div>
 
-          {/* 自适应人数切换 */}
-          <div className="mt-1 pt-2 border-t border-slate-800 flex items-center justify-between">
+          {/* 自适应人数切换 (支持 2~8 任意人数) */}
+          <div className="mt-1 pt-2 border-t border-slate-800 flex flex-col gap-1.5">
             <div className="flex items-center gap-1 text-[11px] text-slate-400">
               <Users className="w-3 h-3 text-amber-400" />
-              <span>测试在座人数:</span>
+              <span>测试在座人数 (2~8人):</span>
             </div>
-            <div className="flex gap-1">
-              {[2, 4, 6, 8].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setMockSeatCount(num)}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 text-[10px] font-mono font-bold transition"
-                >
-                  {num}人
-                </button>
-              ))}
+            <div className="grid grid-cols-7 gap-1">
+              {[2, 3, 4, 5, 6, 7, 8].map((num) => {
+                const currentCount = roomState.seats.filter(Boolean).length;
+                const isActive = currentCount === num;
+                return (
+                  <button
+                    key={num}
+                    onClick={() => setMockSeatCount(num)}
+                    className={`py-1 rounded text-[10px] font-mono font-bold transition ${
+                      isActive
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300'
+                    }`}
+                  >
+                    {num}人
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

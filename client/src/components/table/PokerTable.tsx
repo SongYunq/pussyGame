@@ -27,7 +27,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
       {/* 牌桌主体椭圆外框 */}
       <div className="relative w-full max-w-4xl h-[480px] md:h-[560px] rounded-[180px] md:rounded-[240px] poker-rim bg-gradient-to-b from-[#2b1704] via-[#1a0e02] to-[#2b1704] p-3 md:p-4 border-4 border-amber-600/40 shadow-2xl">
         {/* 内层深色高档绿色毛呢桌面 */}
-        <div className="relative w-full h-full rounded-[160px] md:rounded-[220px] poker-felt-texture border-2 border-emerald-500/20 flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-full rounded-[160px] md:rounded-[220px] poker-felt-texture border-2 border-emerald-500/20 flex items-center justify-center">
           {/* 桌面暗色金线装饰椭圆 */}
           <div className="absolute inset-8 rounded-[140px] md:rounded-[200px] border border-amber-400/15 pointer-events-none" />
 
@@ -62,31 +62,28 @@ export const PokerTable: React.FC<PokerTableProps> = ({
             </div>
           </div>
 
-          {/* 动态 8 人自适应桌位渲染 */}
+          {/* 动态 8 人自适应桌位渲染（外圈贴边头像 + 内圈朝向中心手牌） */}
           {calculatedSeats.map((item) => {
             if (!item.seat) return null;
             const bubble = floatingBubbles.find((b) => b.playerId === item.seat?.user?.id) || null;
             const isCurrentTurn = roomState.currentTurnPlayerId === item.seat.user?.id;
 
             return (
-              <div
+              <TableSeat
                 key={item.seatIndex}
-                className="absolute transition-all duration-500 ease-out -translate-x-1/2 -translate-y-1/2 z-20"
-                style={{
-                  left: `${item.xPercent}%`,
-                  top: `${item.yPercent}%`,
-                }}
-              >
-                <TableSeat
-                  seat={item.seat}
-                  isMe={item.isMe}
-                  isCurrentTurn={isCurrentTurn}
-                  turnDeadline={roomState.turnDeadline}
-                  isPKSelecting={isPKSelecting}
-                  onSelectPKTarget={onSelectPKTarget}
-                  floatingBubble={bubble}
-                />
-              </div>
+                seat={item.seat}
+                isMe={item.isMe}
+                isCurrentTurn={isCurrentTurn}
+                turnDeadline={roomState.turnDeadline}
+                isPKSelecting={isPKSelecting}
+                onSelectPKTarget={onSelectPKTarget}
+                floatingBubble={bubble}
+                xPercent={item.xPercent}
+                yPercent={item.yPercent}
+                cardXPercent={item.cardXPercent}
+                cardYPercent={item.cardYPercent}
+                cardAngleDeg={item.cardAngleDeg}
+              />
             );
           })}
         </div>

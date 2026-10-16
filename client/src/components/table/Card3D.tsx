@@ -28,11 +28,13 @@ export const Card3D: React.FC<Card3DProps> = ({
   size = 'md',
   isFolded = false,
 }) => {
-  // 扇形微位移与倾斜角度
-  const fanRotations = [-10, 0, 10];
-  const fanTranslates = [-14, 0, 14];
+  // 扇形微重叠位移与倾斜角度（在 flex 横排基础上向中心靠拢微叠并呈弧形）
+  const fanRotations = [-12, 0, 12];
+  const fanTranslatesX = [8, 0, -8];
+  const fanTranslatesY = [2, 0, 2];
   const rotZ = fanRotations[fanIndex] ?? 0;
-  const transX = fanTranslates[fanIndex] ?? 0;
+  const transX = fanTranslatesX[fanIndex] ?? 0;
+  const transY = fanTranslatesY[fanIndex] ?? 0;
 
   // 尺寸响应式配置
   const sizeConfig = {
@@ -68,7 +70,7 @@ export const Card3D: React.FC<Card3DProps> = ({
         isFolded ? 'opacity-40 grayscale -translate-y-2' : ''
       }`}
       style={{
-        transform: `translateX(${transX}px) rotateZ(${rotZ}deg)`,
+        transform: `translate(${transX}px, ${transY}px) rotateZ(${rotZ}deg)`,
         perspective: '1000px',
       }}
     >
