@@ -31,14 +31,14 @@ function getPlayerChipZoneCoords(
   const row = Math.floor(stackIndex / 5); // 0: 主排, 1: 靠中心前排, 2: 靠玩家后排
   const col = colOrder[stackIndex % 5] ?? 0;
 
-  // 径向距离（距离中心 50%,50% 的椭圆半轴百分比）：自己面前的筹码排数向中心推进，避免往回压住底部的手牌
-  const rowRadiusOffsets = seatPos.isMe ? [0, -2.6, -5.2] : [0, -3.2, 2.8];
+  // 径向距离（距离中心 50%,50% 的椭圆半轴百分比）：既留出正中央微小的数字呼吸区，又紧靠各玩家前方
+  const rowRadiusOffsets = seatPos.isMe ? [0, -2.2, -4.2] : [0, -3.0, 2.6];
   const rOffset = rowRadiusOffsets[row] ?? 0;
   // 偶数列轻微前后错落 0.5%，营造真实赌场推码的层次感
   const stagger = Math.abs(col) % 2 === 1 ? -0.55 : 0;
 
-  const baseRx = seatPos.isMe ? 13.8 : 19.8;
-  const baseRy = seatPos.isMe ? 11.8 : 15.8;
+  const baseRx = seatPos.isMe ? 15.0 : 20.2;
+  const baseRy = seatPos.isMe ? 13.5 : 16.2;
   const radialRx = baseRx + rOffset + stagger;
   const radialRy = baseRy + rOffset * 0.82 + stagger;
 
@@ -48,8 +48,8 @@ function getPlayerChipZoneCoords(
   const tanX = -sinA;
   const tanY = cosA;
 
-  const tangentStepX = 3.25;
-  const tangentStepY = 2.65;
+  const tangentStepX = 3.35;
+  const tangentStepY = 2.75;
 
   const endX = 50 + radialRx * cosA + col * tangentStepX * tanX;
   const endY = 50 + radialRy * sinA + col * tangentStepY * tanY;
@@ -79,12 +79,18 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           {/* 桌面暗色金线装饰椭圆 */}
           <div className="absolute inset-8 rounded-[140px] md:rounded-[200px] border border-amber-400/15 pointer-events-none" />
 
-          {/* 正中央：仅保留无胶囊的总池金额 */}
-          <div className="relative z-20 pointer-events-none flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold tracking-widest text-amber-300/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              总池
+          {/* 正中央偏上：无光晕半透明全息金字 */}
+          <div className="relative z-30 -translate-y-12 md:-translate-y-14 pointer-events-none flex flex-col items-center justify-center">
+            <span className="text-[10px] font-extrabold tracking-[0.25em] text-amber-200/65">
+              TOTAL
             </span>
-            <span className="text-lg md:text-2xl font-black font-mono tracking-tight text-yellow-300 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] [text-shadow:0_0_14px_rgba(250,204,21,0.55)]">
+            <span
+              className="text-xl md:text-3xl font-black font-mono tracking-tight leading-none"
+              style={{
+                color: 'rgba(253, 224, 71, 0.72)',
+                WebkitTextStroke: '0.75px rgba(254, 249, 195, 0.88)',
+              }}
+            >
               {roomState.totalPot.toLocaleString()}
             </span>
           </div>
