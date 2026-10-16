@@ -284,28 +284,27 @@ export class Room {
 
     const seatIdx = this.findSeatIndexByUserId(userId);
     const seat = this.seats[seatIdx]!;
-    const isSeen = seat.hasLooked;
+    const betMultiplier = seat.hasLooked ? 1 : 0.5;
 
     let payAmount = 0;
+    let nextBet = this.currentBet;
 
     if (actionType === 'call') {
-      payAmount = this.currentBet * (isSeen ? 2 : 1);
+      payAmount = this.currentBet * betMultiplier;
     } else if (actionType === 'raise') {
       const targetBet = Number(chipOption);
-      if (isNaN(targetBet) || targetBet <= this.currentBet) {
+      if (!Number.isFinite(targetBet) || targetBet <= this.currentBet) {
         throw new Error('加注档位必须大于当前单注');
       }
-      this.currentBet = targetBet;
-      payAmount = targetBet * (isSeen ? 2 : 1);
+      nextBet = targetBet;
+      payAmount = targetBet * betMultiplier;
     } else if (actionType === 'allin') {
       payAmount = seat.user!.balance;
       if (payAmount <= 0) {
         throw new Error('筹码不足');
       }
-      const effectiveBet = Math.floor(payAmount / (isSeen ? 2 : 1));
-      if (effectiveBet > this.currentBet) {
-        this.currentBet = effectiveBet;
-      }
+      const effectiveBet = payAmount / betMultiplier;
+      nextBet = Math.max(this.currentBet, effectiveBet);
     }
 
     // 扣减筹码
@@ -315,6 +314,7 @@ export class Room {
       'bet',
       `第 ${this.roomId} 房间${actionType === 'raise' ? '加注' : actionType === 'allin' ? '全押' : '跟注'}`
     );
+    this.currentBet = nextBet;
     seat.user!.balance = res.balance;
     seat.currentInvested += payAmount;
     this.totalPot += payAmount;
@@ -403,8 +403,8 @@ export class Room {
       throw new Error('比牌对象必须处于存活对局状态');
     }
 
-    // 比牌消耗：当前单注的 2 倍（若已看牌按明注倍率）
-    const cost = this.currentBet * 2 * (initSeat.hasLooked ? 2 : 1);
+    // 比牌消耗：发起方跟注金额的 2 倍（明牌 2 倍基准，闷牌 1 倍基准）
+    const cost = this.currentBet * 2 * (initSeat.hasLooked ? 1 : 0.5);
     if (initSeat.user!.balance < cost) {
       throw new Error('筹码不足，无法发起比牌');
     }

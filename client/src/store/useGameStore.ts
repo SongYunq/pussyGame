@@ -80,7 +80,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       const meSeat = updatedState.seats.find((s) => s?.user?.id === get().currentUser.id);
       set((state) => {
         const isNewHandReset =
-          updatedState.status === 'WAITING' ||
+          updatedState.gameStatus === 'waiting' ||
           updatedState.totalPot === 0 ||
           (updatedState.currentRound === 1 && state.roomState.currentRound > 1);
         return {
@@ -103,7 +103,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       );
       if (betEvent.actionType === 'allin') {
         get().triggerAllInEffect();
-      } else if (betEvent.actualAmount >= 5000 || betEvent.chipValue >= 5000) {
+      } else if (betEvent.actualAmount >= 5000) {
         get().triggerGoldStreamEffect();
       }
     }
@@ -183,7 +183,8 @@ export const useGameStore = create<GameStore>((set, get) => {
 
       if (mockController) {
         const { winnerId, loserId } = mockController.compare(currentUser.id, targetPlayerId);
-        const cost = roomState.currentBet * 2;
+        const mySeat = roomState.seats.find((s) => s?.user?.id === currentUser.id);
+        const cost = roomState.currentBet * 2 * (mySeat?.hasLooked ? 1 : 0.5);
         const clashEvent: CompareResultEvent = {
           initiatorId: currentUser.id,
           targetId: targetPlayerId,
@@ -301,7 +302,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     updateRoomState: (newState) => {
       set((state) => {
         const isNewHandReset =
-          newState.status === 'WAITING' ||
+          newState.gameStatus === 'waiting' ||
           newState.totalPot === 0 ||
           (newState.currentRound === 1 && state.roomState.currentRound > 1);
         return {

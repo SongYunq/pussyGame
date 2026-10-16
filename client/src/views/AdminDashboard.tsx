@@ -12,7 +12,6 @@ import {
   Sliders,
   RefreshCw,
   Search,
-  Filter,
   LogOut,
   CheckCircle2,
   AlertTriangle,
@@ -422,7 +421,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       const pFlush = baseFlush / totalWeight;
       const pStraight = baseStraight / totalWeight;
       const pPair = basePair / totalWeight;
-      const pHigh = baseHigh / totalWeight;
 
       const cLeopard = Math.round(total * pLeopard);
       const cSF = Math.round(total * pSF);

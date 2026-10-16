@@ -224,14 +224,16 @@ export class MockGameController {
       const seat = draft.seats.find((s) => s?.user?.id === playerId);
       if (!seat || !seat.user) return;
 
+      const betMultiplier = seat.hasLooked ? 1 : 0.5;
       let betAmount = chipValue;
       if (actionType === 'call') {
-        betAmount = seat.hasLooked ? draft.currentBet * 2 : draft.currentBet;
+        betAmount = draft.currentBet * betMultiplier;
       } else if (actionType === 'raise') {
         draft.currentBet = Math.max(draft.currentBet, chipValue);
-        betAmount = seat.hasLooked ? chipValue * 2 : chipValue;
+        betAmount = chipValue * betMultiplier;
       } else if (actionType === 'allin') {
         betAmount = seat.user.balance;
+        draft.currentBet = Math.max(draft.currentBet, betAmount / betMultiplier);
       }
 
       betAmount = Math.min(betAmount, seat.user.balance);
@@ -287,16 +289,16 @@ export class MockGameController {
       if (!targetSeat || !targetSeat.user) return;
 
       // 调测台模式下自动保持充足测试余额，避免狂点耗尽余额导致主流程或动画异常
-      if (targetSeat.user.balance < chipValue * 2) {
-        targetSeat.user.balance = Math.max(10000, chipValue * 4);
+      if (targetSeat.user.balance < chipValue) {
+        targetSeat.user.balance = Math.max(10000, chipValue * 2);
       }
 
       const displayAmount =
         actionType === 'allin'
           ? 5000
           : targetSeat.hasLooked
-            ? chipValue * 2
-            : chipValue;
+            ? chipValue
+            : chipValue * 0.5;
 
       draft.totalPot += displayAmount;
 
@@ -352,7 +354,7 @@ export class MockGameController {
     this.update((draft) => {
       const seat = draft.seats.find((s) => s?.user?.id === initiatorId);
       if (seat && seat.user) {
-        const cost = seat.hasLooked ? draft.currentBet * 4 : draft.currentBet * 2;
+        const cost = draft.currentBet * 2 * (seat.hasLooked ? 1 : 0.5);
         seat.user.balance = Math.max(0, seat.user.balance - cost);
         seat.currentInvested += cost;
         draft.totalPot += cost;
@@ -430,7 +432,8 @@ export class MockGameController {
       // 机器人决策：约 35% 概率加注到更高一档，其余跟注
       const raiseTiers = [20, 50, 100, 500, 1000];
       const nextTier = raiseTiers.find((t) => t > this.state.currentBet);
-      const shouldRaise = nextTier !== undefined && Math.random() < 0.35 && seat.user.balance >= nextTier * 2;
+      const hasLooked = this.state.seats.find((s) => s?.user?.id === botId)?.hasLooked;
+      const shouldRaise = nextTier !== undefined && Math.random() < 0.35 && seat.user.balance >= nextTier * (hasLooked ? 1 : 0.5);
 
       if (shouldRaise && nextTier) {
         this.bet(botId, 'raise', nextTier);

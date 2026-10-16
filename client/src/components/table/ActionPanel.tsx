@@ -52,10 +52,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const isAlive = mySeat?.status === 'active';
   const isRaised = currentBet > baseAnte;
 
-  // 跟注所需筹码：看牌者下注 2x，未看牌者 1x
-  const callAmount = hasLooked ? currentBet * 2 : currentBet;
-  // 比牌所需筹码：第2轮起开放，单注的 2 倍（看牌者乘明注倍率即 4x）
-  const pkCost = hasLooked ? currentBet * 4 : currentBet * 2;
+  // 底注不变；后续下注明牌为 1 倍，闷牌为 0.5 倍
+  const betMultiplier = hasLooked ? 1 : 0.5;
+  const callAmount = currentBet * betMultiplier;
+  // 比牌所需筹码：第 2 轮起开放，为自身跟注金额的 2 倍
+  const pkCost = callAmount * 2;
   const canPK = isMyTurn && currentRound >= 2 && myBalance >= pkCost;
 
   const raiseOptions = [10, 20, 50, 100, 500, 1000, 5000];
@@ -102,10 +103,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {showRaiseDrawer && isMyTurn && isAlive && (
         <div className="absolute bottom-full inset-x-0 bg-slate-900/95 border-t border-amber-500/30 p-3 shadow-2xl flex flex-wrap justify-center gap-2 z-40 animate-fade-in">
           <div className="w-full text-center text-xs text-amber-400 font-bold mb-1">
-            选择加注基准（明注自动乘 2）
+            选择加注后的注额（闷注减半）
           </div>
           {raiseOptions.map((opt) => {
-            const actualCost = hasLooked ? opt * 2 : opt;
+            const actualCost = opt * betMultiplier;
             const disabled = actualCost > myBalance || opt <= currentBet;
             return (
               <button
@@ -129,7 +130,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       )}
 
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-        {/* 左侧：社交互动、看牌 + 轮数与明暗注基准信息 */}
+        {/* 左侧：社交互动、看牌 + 轮数、当前注额与闷注信息 */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -146,7 +147,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <MessageSquare className="w-5 h-5" />
           </button>
 
-          {/* 轮数与明暗注/加注基准栏 */}
+          {/* 以当前注额为主，闷注金额作为补充说明 */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-[11px] font-mono font-bold">
             <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-black">
               第 {currentRound}/20 轮
@@ -160,11 +161,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             >
               {isRaised && <Flame className="w-3 h-3 text-yellow-200 fill-yellow-200" />}
               <span>
-                {isRaised ? '加注' : '暗注'} {currentBet}
+                当前注额 {currentBet}
               </span>
               <span className="opacity-70">·</span>
-              <span className={isRaised ? 'text-yellow-100' : 'text-amber-300'}>
-                明注 {currentBet * 2}
+              <span className="text-[10px] font-medium opacity-70">
+                闷注 {currentBet * 0.5}
               </span>
             </span>
           </div>

@@ -61,7 +61,7 @@ export interface RoomState {
   currentRound: number;
   currentTurnPlayerId: number | null;
   turnDeadline: number | null;
-  currentBet: number;
+  currentBet: number;       // 明牌单注基准，闷牌下注为其一半；不影响开局底注
   totalPot: number;
   dealerSeatIndex: number;
   seats: (TableSeat | null)[];

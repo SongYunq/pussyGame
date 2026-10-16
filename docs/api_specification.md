@@ -503,7 +503,7 @@ const socket = io("http://localhost:3000", {
   "currentRound": 3,      // 当前对局进行到第几轮 (上限 20 轮)
   "currentTurnPlayerId": 1, // 当前该谁操作
   "turnDeadline": 1799889920000, // 倒计时截止时间戳 (前端做本地进度条与倒数)
-  "currentBet": 20,       // 当前单注基准（看牌者以此注 * 2 下注）
+  "currentBet": 20,       // 当前明牌单注基准（明牌下注 20，闷牌下注 10；开局底注另按 baseAnte 扣除）
   "totalPot": 380,        // 桌面中央奖池总筹码
   "dealerSeatIndex": 0,   // 庄家座位索引
   "seats": [              // 动态 8 个座位数组 (无人的位置为 null)
@@ -568,7 +568,7 @@ const socket = io("http://localhost:3000", {
 
 #### 2. 看牌操作
 * **客户端发出**：`game:look`
-* **说明**：玩家本地触发 3D 翻牌动效，向服务端上报状态；服务端记录该玩家 `hasLooked: true`，后续下注金额强制翻倍。
+* **说明**：玩家本地触发 3D 翻牌动效，向服务端上报状态；服务端记录该玩家 `hasLooked: true`，后续按 `currentBet` 的 1 倍下注；未看牌时为 0.5 倍。开局底注始终按 `baseAnte` 原额扣除。
 * **服务端向全桌广播**：`game:player_looked`
 ```json
 {
@@ -582,9 +582,9 @@ const socket = io("http://localhost:3000", {
 * **入参**：
 ```json
 {
-  "actionType": "call", // "call" (跟注) | "raise" (加注) | "allin" (全押)
+  "actionType": "raise", // "call" (跟注) | "raise" (加注) | "allin" (全押)
   "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 1000 | 5000 | "allin"
-  "amount": 100         // 最终根据明注/暗注折算后的实际扣款筹码
+  "amount": 50          // 可选；实际扣款由服务端按明牌 1 倍、闷牌 0.5 倍计算，不信任客户端金额
 }
 ```
 * **服务端广播**：`game:player_bet` (触发筹码飞入底池动效)
@@ -593,9 +593,9 @@ const socket = io("http://localhost:3000", {
   "playerId": 1,
   "actionType": "raise",
   "chipOption": 50,
-  "amount": 100,
-  "totalPot": 480,
-  "playerBalance": 9700,
+  "amount": 50,
+  "totalPot": 430,
+  "playerBalance": 9750,
   "specialEffect": null // "none" | "gold" (5000+ 专属金光) | "allin" (All-in 全场震颤雷电)
 }
 ```
@@ -615,7 +615,7 @@ const socket = io("http://localhost:3000", {
 ### 4.4 特效广播与比牌决斗 (Animation & Showdown)
 
 #### 1. 发起双人比牌 (PK)
-* **条件**：第 2 轮起开放，比牌花费为当前单注的 2 倍（已看牌按明注倍率算）。
+* **条件**：第 2 轮起开放，比牌花费为发起方一次跟注金额的 2 倍（闷牌为 `currentBet` 的 1 倍，明牌为 2 倍）。
 * **客户端发出**：`game:compare`
 * **入参**：
 ```json
@@ -633,8 +633,8 @@ const socket = io("http://localhost:3000", {
   "targetId": 2,
   "winnerId": 1,
   "loserId": 2,
-  "cost": 40,
-  "totalPot": 520
+  "cost": 100,
+  "totalPot": 530
 }
 ```
 *前端动效表现*：屏幕中央出现两人头像的 1v1 烈焰雷霆对撞动画，随后 `loserId` 玩家头像变灰并打上“淘汰/败”印章。
@@ -644,7 +644,7 @@ const socket = io("http://localhost:3000", {
 ```json
 {
   "winnerId": 1,
-  "winAmount": 520,
+  "winAmount": 530,
   "reason": "last_survivor", // "last_survivor" (其他人全弃牌/比牌出局) | "max_round_showdown" (打满20轮全开比大小)
   "revealedCards": [         // 终局亮牌列表（若因其他人全弃牌获胜，赢家可选择亮牌或不亮）
     {

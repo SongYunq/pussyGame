@@ -298,7 +298,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-blue-400">4. 明注与暗注：</span>
                 <p className="mt-1 text-slate-300">
-                  未看牌（闷牌）下注为 1 倍；已看牌（明注）必须下注 2 倍；单局上限 20 轮强制全开结算。
+                  开局底注按原额扣除；后续未看牌（闷牌）按当前单注的 0.5 倍下注，已看牌（明注）按 1 倍下注；加注后同样折算。单局上限 20 轮强制全开结算。
                 </p>
               </div>
             </div>
