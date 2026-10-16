@@ -100,6 +100,14 @@ export function createInitialMockRoom(seatCount = 4): RoomState {
   };
 }
 
+export interface MockBetNotification {
+  seatIndex: number;
+  playerId: number;
+  actionType: 'call' | 'raise' | 'allin';
+  chipValue: number;
+  actualAmount: number;
+}
+
 /**
  * 纯前端 Mock 游戏控制器
  */
@@ -107,14 +115,28 @@ export class MockGameController {
   private state: RoomState;
   private secretCards: Map<number, Card[]> = new Map();
   private onStateChange: (state: RoomState) => void;
+  private onPlayerBet?: (event: MockBetNotification) => void;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(onStateChange: (state: RoomState) => void, initialSeatCount = 4) {
+  constructor(
+    onStateChange: (state: RoomState) => void,
+    initialSeatCount = 4,
+    onPlayerBet?: (event: MockBetNotification) => void
+  ) {
     this.state = createInitialMockRoom(initialSeatCount);
     this.onStateChange = onStateChange;
+    this.onPlayerBet = onPlayerBet;
   }
 
   public getState(): RoomState {
     return this.state;
+  }
+
+  private clearBotTimer() {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
   }
 
   private update(updater: (draft: RoomState) => void) {
@@ -128,6 +150,7 @@ export class MockGameController {
    * 重设在座人数 (2~8 人) 测试自适应桌位排布
    */
   public setSeatCount(count: number) {
+    this.clearBotTimer();
     this.state = createInitialMockRoom(count);
     this.secretCards.clear();
     this.onStateChange(this.state);
@@ -137,6 +160,7 @@ export class MockGameController {
    * 一键发牌开局
    */
   public startDeal() {
+    this.clearBotTimer();
     const deck = generateShuffledDeck();
     let cardIdx = 0;
     this.secretCards.clear();
@@ -193,10 +217,8 @@ export class MockGameController {
    * 下注 / 加注 / All-in
    */
   public bet(playerId: number, actionType: 'call' | 'raise' | 'allin', chipValue: number) {
-    sound.playChip();
-    if (actionType === 'allin' || chipValue >= 5000) {
-      if (actionType === 'allin') sound.playAllIn();
-    }
+    this.clearBotTimer();
+    let notification: MockBetNotification | null = null;
 
     this.update((draft) => {
       const seat = draft.seats.find((s) => s?.user?.id === playerId);
@@ -206,8 +228,8 @@ export class MockGameController {
       if (actionType === 'call') {
         betAmount = seat.hasLooked ? draft.currentBet * 2 : draft.currentBet;
       } else if (actionType === 'raise') {
-        draft.currentBet = chipValue;
-        betAmount = seat.hasLooked ? draft.currentBet * 2 : draft.currentBet;
+        draft.currentBet = Math.max(draft.currentBet, chipValue);
+        betAmount = seat.hasLooked ? chipValue * 2 : chipValue;
       } else if (actionType === 'allin') {
         betAmount = seat.user.balance;
       }
@@ -217,14 +239,86 @@ export class MockGameController {
       seat.currentInvested += betAmount;
       draft.totalPot += betAmount;
 
-      this.advanceTurn(draft);
+      notification = {
+        seatIndex: seat.seatIndex,
+        playerId,
+        actionType,
+        chipValue,
+        actualAmount: betAmount,
+      };
+
+      if (draft.gameStatus === 'playing') {
+        this.advanceTurn(draft);
+      }
     });
+
+    if (notification && this.onPlayerBet) {
+      this.onPlayerBet(notification);
+    }
+
+    this.scheduleBotTurnIfNeeded();
+  }
+
+  /**
+   * 仅供 DevTool 调测台使用的独立筹码动画测试方法（不影响主流程出牌轮转与真实余额限制）
+   */
+  public devToolBet(
+    actionType: 'call' | 'raise' | 'allin',
+    chipValue: number,
+    fromOpponent = false
+  ) {
+    this.clearBotTimer();
+    let notification: MockBetNotification | null = null;
+
+    this.update((draft) => {
+      let targetSeat: TableSeat | undefined;
+
+      if (fromOpponent) {
+        const opponents = draft.seats.filter(
+          (s): s is TableSeat => Boolean(s && s.user && s.user.id !== MOCK_ME.id)
+        );
+        if (opponents.length > 0) {
+          targetSeat = opponents[Math.floor(Math.random() * opponents.length)];
+        }
+      } else {
+        targetSeat = draft.seats.find((s) => s?.user?.id === MOCK_ME.id) || undefined;
+      }
+
+      if (!targetSeat || !targetSeat.user) return;
+
+      // 调测台模式下自动保持充足测试余额，避免狂点耗尽余额导致主流程或动画异常
+      if (targetSeat.user.balance < chipValue * 2) {
+        targetSeat.user.balance = Math.max(10000, chipValue * 4);
+      }
+
+      const displayAmount =
+        actionType === 'allin'
+          ? 5000
+          : targetSeat.hasLooked
+            ? chipValue * 2
+            : chipValue;
+
+      draft.totalPot += displayAmount;
+
+      notification = {
+        seatIndex: targetSeat.seatIndex,
+        playerId: targetSeat.user.id,
+        actionType,
+        chipValue,
+        actualAmount: displayAmount,
+      };
+    });
+
+    if (notification && this.onPlayerBet) {
+      this.onPlayerBet(notification);
+    }
   }
 
   /**
    * 弃牌
    */
   public fold(playerId: number) {
+    this.clearBotTimer();
     this.update((draft) => {
       const seat = draft.seats.find((s) => s?.user?.id === playerId);
       if (seat) {
@@ -232,12 +326,14 @@ export class MockGameController {
       }
       this.checkWinnerOrAdvance(draft);
     });
+    this.scheduleBotTurnIfNeeded();
   }
 
   /**
    * 发起比牌 PK
    */
   public compare(initiatorId: number, targetId: number): { winnerId: number; loserId: number } {
+    this.clearBotTimer();
     sound.playPKClash();
 
     const cardsA = this.secretCards.get(initiatorId);
@@ -270,6 +366,7 @@ export class MockGameController {
       this.checkWinnerOrAdvance(draft);
     });
 
+    this.scheduleBotTurnIfNeeded();
     return { winnerId, loserId };
   }
 
@@ -277,6 +374,7 @@ export class MockGameController {
    * 终局胜出结算
    */
   public triggerSettlement(winnerId: number) {
+    this.clearBotTimer();
     sound.playWin();
     this.update((draft) => {
       draft.gameStatus = 'settling';
@@ -295,13 +393,51 @@ export class MockGameController {
     }
 
     const currentSeatIndex = draft.seats.findIndex((s) => s?.user?.id === draft.currentTurnPlayerId);
-    let nextIndex = (currentSeatIndex + 1) % 8;
+    const startIdx = currentSeatIndex >= 0 ? currentSeatIndex : 0;
+    let nextIndex = (startIdx + 1) % 8;
     while (!draft.seats[nextIndex] || draft.seats[nextIndex]?.status !== 'active') {
       nextIndex = (nextIndex + 1) % 8;
     }
 
+    if (nextIndex <= startIdx) {
+      draft.currentRound = Math.min(20, draft.currentRound + 1);
+    }
+
     draft.currentTurnPlayerId = draft.seats[nextIndex]!.user!.id;
     draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
+  }
+
+  private scheduleBotTurnIfNeeded() {
+    this.clearBotTimer();
+    if (this.state.gameStatus !== 'playing') return;
+
+    const turnPlayerId = this.state.currentTurnPlayerId;
+    if (!turnPlayerId || turnPlayerId === MOCK_ME.id) return;
+
+    this.botTimer = setTimeout(() => {
+      if (this.state.gameStatus !== 'playing') return;
+      const botId = this.state.currentTurnPlayerId;
+      if (!botId || botId === MOCK_ME.id) return;
+
+      const seat = this.state.seats.find((s) => s?.user?.id === botId);
+      if (!seat || !seat.user || seat.status !== 'active') return;
+
+      // 机器人有一定概率先看牌
+      if (!seat.hasLooked && Math.random() < 0.3) {
+        this.lookCards(botId);
+      }
+
+      // 机器人决策：约 35% 概率加注到更高一档，其余跟注
+      const raiseTiers = [20, 50, 100, 500, 1000];
+      const nextTier = raiseTiers.find((t) => t > this.state.currentBet);
+      const shouldRaise = nextTier !== undefined && Math.random() < 0.35 && seat.user.balance >= nextTier * 2;
+
+      if (shouldRaise && nextTier) {
+        this.bet(botId, 'raise', nextTier);
+      } else {
+        this.bet(botId, 'call', this.state.currentBet);
+      }
+    }, 1150);
   }
 
   private checkWinnerOrAdvance(draft: RoomState) {

@@ -27,6 +27,7 @@ export const TableView: React.FC<TableViewProps> = ({
     isAllInTriggered,
     isGoldStreamTriggered,
     floatingBubbles,
+    flyingChips,
     isMuted,
     toggleMute,
     dealCards,
@@ -131,6 +132,7 @@ export const TableView: React.FC<TableViewProps> = ({
           isPKSelecting={isPKSelecting}
           onSelectPKTarget={compareWithPlayer}
           floatingBubbles={floatingBubbles}
+          flyingChips={flyingChips}
         />
       </main>
 

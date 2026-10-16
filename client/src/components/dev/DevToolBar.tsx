@@ -7,9 +7,7 @@ export const DevToolBar: React.FC = () => {
   const {
     dealCards,
     lookCards,
-    bet,
-    triggerAllInEffect,
-    triggerGoldStreamEffect,
+    devToolBet,
     setMockSeatCount,
     roomState,
     currentUser,
@@ -99,26 +97,47 @@ export const DevToolBar: React.FC = () => {
             </button>
 
             <button
-              onClick={() => bet('raise', 100)}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-950/80 border border-amber-500/40 text-amber-300 rounded-lg hover:bg-amber-900/80 font-bold"
+              onClick={() => devToolBet('raise', 20)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-950/70 border border-amber-500/30 text-amber-200 rounded-lg hover:bg-amber-900/80 font-bold"
             >
-              <span>加注 100</span>
+              <span>小注筹码 (+20)</span>
             </button>
 
             <button
-              onClick={triggerGoldStreamEffect}
+              onClick={() => devToolBet('raise', 100)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-950/80 border border-amber-500/40 text-amber-300 rounded-lg hover:bg-amber-900/80 font-bold"
+            >
+              <span>中注筹码 (+100)</span>
+            </button>
+
+            <button
+              onClick={() => devToolBet('raise', 1000)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-900/80 border border-amber-400/50 text-amber-200 rounded-lg hover:bg-amber-800/80 font-bold"
+            >
+              <span>高摞筹码 (+1000)</span>
+            </button>
+
+            <button
+              onClick={() => devToolBet('raise', 500, true)}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 rounded-lg hover:bg-cyan-900/80 font-bold"
+            >
+              <span>对手加注筹码</span>
+            </button>
+
+            <button
+              onClick={() => devToolBet('raise', 5000)}
               className="flex items-center justify-center gap-1 py-1.5 px-2 bg-yellow-950/80 border border-yellow-500/40 text-yellow-300 rounded-lg hover:bg-yellow-900/80 font-bold"
             >
               <Sparkles className="w-3 h-3" />
-              <span>5000+ 金光</span>
+              <span>5000+ 超高筹码</span>
             </button>
 
             <button
-              onClick={triggerAllInEffect}
+              onClick={() => devToolBet('allin', 9999)}
               className="flex items-center justify-center gap-1 py-1.5 px-2 bg-red-950/80 border border-red-500/40 text-red-300 rounded-lg hover:bg-red-900/80 font-bold"
             >
               <Flame className="w-3 h-3" />
-              <span>All-in 震颤</span>
+              <span>All-in 满柱</span>
             </button>
 
             <button
@@ -131,10 +150,10 @@ export const DevToolBar: React.FC = () => {
 
             <button
               onClick={handleSimulateSettlement}
-              className="col-span-2 flex items-center justify-center gap-1 py-1.5 px-2 bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 rounded-lg font-black"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 rounded-lg font-black"
             >
               <Trophy className="w-3.5 h-3.5" />
-              <span>终局胜利结算战报</span>
+              <span>终局结算战报</span>
             </button>
           </div>
 

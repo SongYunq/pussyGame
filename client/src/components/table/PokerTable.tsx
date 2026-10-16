@@ -2,8 +2,9 @@ import React from 'react';
 import { RoomState } from '../../types/game';
 import { useTableLayout } from '../../hooks/useTableLayout';
 import { TableSeat } from './TableSeat';
+import { FlyingChipStack } from './FlyingChipStack';
 import { Coins } from 'lucide-react';
-import { FloatingBubble } from '../../store/useGameStore';
+import { FloatingBubble, FlyingChip } from '../../store/useGameStore';
 
 interface PokerTableProps {
   roomState: RoomState;
@@ -11,6 +12,7 @@ interface PokerTableProps {
   isPKSelecting: boolean;
   onSelectPKTarget: (targetPlayerId: number) => void;
   floatingBubbles: FloatingBubble[];
+  flyingChips: FlyingChip[];
 }
 
 export const PokerTable: React.FC<PokerTableProps> = ({
@@ -19,8 +21,10 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   isPKSelecting,
   onSelectPKTarget,
   floatingBubbles,
+  flyingChips,
 }) => {
   const calculatedSeats = useTableLayout(roomState.seats, myUserId);
+  const hasIncomingChips = flyingChips.length > 0;
 
   return (
     <div className="relative w-full h-full flex items-center justify-center p-3 select-none overflow-hidden">
@@ -32,7 +36,13 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           <div className="absolute inset-8 rounded-[140px] md:rounded-[200px] border border-amber-400/15 pointer-events-none" />
 
           {/* 桌面中央底池与对局信息 */}
-          <div className="relative z-10 flex flex-col items-center justify-center p-3 rounded-2xl bg-black/40 backdrop-blur-sm border border-amber-500/20 shadow-2xl">
+          <div
+            className={`relative z-10 flex flex-col items-center justify-center p-3 rounded-2xl bg-black/40 backdrop-blur-sm border transition-all duration-300 shadow-2xl ${
+              hasIncomingChips
+                ? 'border-amber-400/70 shadow-[0_0_28px_rgba(251,191,36,0.35)] scale-[1.03]'
+                : 'border-amber-500/20'
+            }`}
+          >
             {/* 轮数与状态标签 */}
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-500/30">
@@ -61,6 +71,24 @@ export const PokerTable: React.FC<PokerTableProps> = ({
               单注基准: <span className="font-bold text-amber-300">{roomState.currentBet}</span> (明注 {roomState.currentBet * 2})
             </div>
           </div>
+
+          {/* 玩家身前出现并移向牌桌中央的立体筹码堆动画层 */}
+          {flyingChips.map((chip) => {
+            const seatPos = calculatedSeats.find((s) => s.seatIndex === chip.fromSeatIndex);
+            const startX = seatPos ? seatPos.chipXPercent : 50;
+            const startY = seatPos ? seatPos.chipYPercent : 69;
+
+            return (
+              <FlyingChipStack
+                key={chip.id}
+                chip={chip}
+                startXPercent={startX}
+                startYPercent={startY}
+                endXPercent={50}
+                endYPercent={50}
+              />
+            );
+          })}
 
           {/* 动态 8 人自适应桌位渲染（外圈贴边头像 + 内圈朝向中心手牌） */}
           {calculatedSeats.map((item) => {

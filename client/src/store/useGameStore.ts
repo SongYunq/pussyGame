@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { CompareResultEvent, GameOverEvent, RoomState, UserProfile } from '../types/game';
 import { MockGameController, MOCK_ME } from './mock/mockGameService';
 import { sound } from '../audio/SoundManager';
+import { getChipStackCount } from '../components/table/FlyingChipStack';
 
 export interface FloatingBubble {
   id: string;
@@ -16,6 +17,8 @@ export interface FlyingChip {
   fromSeatIndex: number;
   toPot: boolean; // true: from player to pot, false: from pot to winner
   chipValue: number;
+  actualAmount?: number;
+  actionType?: 'call' | 'raise' | 'allin';
 }
 
 interface GameStore {
@@ -32,7 +35,7 @@ interface GameStore {
   isAllInTriggered: boolean; // All-in 暗红雷电全屏震颤
   isGoldStreamTriggered: boolean; // 5000+ 金光粒子横幅
   floatingBubbles: FloatingBubble[]; // 浮动表情气泡
-  flyingChips: FlyingChip[]; // 正在飞行的筹码动画实体
+  flyingChips: FlyingChip[]; // 正在飞行的筹码堆动画实体
   isMuted: boolean;
 
   // 动作分发
@@ -41,6 +44,7 @@ interface GameStore {
   dealCards: () => void;
   lookCards: () => void;
   bet: (actionType: 'call' | 'raise' | 'allin', chipValue: number) => void;
+  devToolBet: (actionType: 'call' | 'raise' | 'allin', chipValue: number, fromOpponent?: boolean) => void;
   fold: () => void;
   setPKSelecting: (selecting: boolean) => void;
   compareWithPlayer: (targetPlayerId: number) => void;
@@ -50,16 +54,45 @@ interface GameStore {
   triggerGoldStreamEffect: () => void;
   sendEmoji: (emoji: string) => void;
   sendPhrase: (phrase: string) => void;
-  addFlyingChip: (fromSeatIndex: number, chipValue: number, toPot?: boolean) => void;
+  addFlyingChip: (
+    fromSeatIndex: number,
+    chipValue: number,
+    toPot?: boolean,
+    actualAmount?: number,
+    actionType?: 'call' | 'raise' | 'allin'
+  ) => void;
   updateRoomState: (state: RoomState) => void;
   setCurrentUser: (user: UserProfile) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
   // 初始化 Mock 控制器
-  const controller = new MockGameController((updatedState) => {
-    set({ roomState: updatedState });
-  }, 4);
+  const controller = new MockGameController(
+    (updatedState) => {
+      const meSeat = updatedState.seats.find((s) => s?.user?.id === get().currentUser.id);
+      set((state) => ({
+        roomState: updatedState,
+        currentUser: meSeat?.user
+          ? { ...state.currentUser, balance: meSeat.user.balance }
+          : state.currentUser,
+      }));
+    },
+    4,
+    (betEvent) => {
+      get().addFlyingChip(
+        betEvent.seatIndex,
+        betEvent.chipValue,
+        true,
+        betEvent.actualAmount,
+        betEvent.actionType
+      );
+      if (betEvent.actionType === 'allin') {
+        get().triggerAllInEffect();
+      } else if (betEvent.actualAmount >= 5000 || betEvent.chipValue >= 5000) {
+        get().triggerGoldStreamEffect();
+      }
+    }
+  );
 
   return {
     isMockMode: true,
@@ -103,21 +136,16 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     bet: (actionType, chipValue) => {
-      const { mockController, currentUser, roomState } = get();
-      const mySeat = roomState.seats.find((s) => s?.user?.id === currentUser.id);
-      const mySeatIndex = mySeat ? mySeat.seatIndex : 0;
-
-      // 触发筹码飞行
-      get().addFlyingChip(mySeatIndex, chipValue, true);
-
-      if (actionType === 'allin') {
-        get().triggerAllInEffect();
-      } else if (chipValue >= 5000) {
-        get().triggerGoldStreamEffect();
-      }
-
+      const { mockController, currentUser } = get();
       if (mockController) {
         mockController.bet(currentUser.id, actionType, chipValue);
+      }
+    },
+
+    devToolBet: (actionType, chipValue, fromOpponent = false) => {
+      const { mockController } = get();
+      if (mockController) {
+        mockController.devToolBet(actionType, chipValue, fromOpponent);
       }
     },
 
@@ -214,11 +242,17 @@ export const useGameStore = create<GameStore>((set, get) => {
       }, 3500);
     },
 
-    addFlyingChip: (fromSeatIndex, chipValue, toPot = true) => {
+    addFlyingChip: (fromSeatIndex, chipValue, toPot = true, actualAmount, actionType) => {
+      const effectiveAmount = actualAmount ?? chipValue;
+      const stackCount = getChipStackCount(effectiveAmount, actionType);
+      sound.playChipStack(stackCount);
+
       const chip: FlyingChip = {
         id: Math.random().toString(36).substring(2, 9),
         fromSeatIndex,
         chipValue,
+        actualAmount: effectiveAmount,
+        actionType,
         toPot,
       };
       set((state) => ({
@@ -228,7 +262,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         set((state) => ({
           flyingChips: state.flyingChips.filter((c) => c.id !== chip.id),
         }));
-      }, 700);
+      }, 1350);
     },
 
     updateRoomState: (newState) => {
