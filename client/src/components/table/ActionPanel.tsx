@@ -5,6 +5,7 @@ import { Eye, Flame, Swords, ShieldAlert, Sparkles, Smile, MessageSquare, Chevro
 interface ActionPanelProps {
   mySeat: TableSeat | null;
   isMyTurn: boolean;
+  baseAnte?: number;
   currentBet: number;
   currentRound: number;
   gameStatus: 'waiting' | 'playing' | 'settling';
@@ -29,6 +30,7 @@ const PHRASES = [
 export const ActionPanel: React.FC<ActionPanelProps> = ({
   mySeat,
   isMyTurn,
+  baseAnte = 10,
   currentBet,
   currentRound,
   gameStatus,
@@ -48,6 +50,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const myBalance = mySeat?.user?.balance ?? 0;
   const isPlaying = gameStatus === 'playing';
   const isAlive = mySeat?.status === 'active';
+  const isRaised = currentBet > baseAnte;
 
   // 跟注所需筹码：看牌者下注 2x，未看牌者 1x
   const callAmount = hasLooked ? currentBet * 2 : currentBet;
@@ -126,8 +129,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       )}
 
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-        {/* 左侧：社交互动与看牌 */}
-        <div className="flex items-center gap-1.5">
+        {/* 左侧：社交互动、看牌 + 轮数与明暗注基准信息 */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="p-2 rounded-xl bg-slate-800/80 text-amber-400 hover:bg-slate-700 transition"
@@ -142,6 +145,29 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           >
             <MessageSquare className="w-5 h-5" />
           </button>
+
+          {/* 轮数与明暗注/加注基准栏 */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-[11px] font-mono font-bold">
+            <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-black">
+              第 {currentRound}/20 轮
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded flex items-center gap-1 font-black ${
+                isRaised
+                  ? 'bg-gradient-to-r from-rose-600/90 to-amber-500/90 text-white border border-yellow-300/60'
+                  : 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/40'
+              }`}
+            >
+              {isRaised && <Flame className="w-3 h-3 text-yellow-200 fill-yellow-200" />}
+              <span>
+                {isRaised ? '加注' : '暗注'} {currentBet}
+              </span>
+              <span className="opacity-70">·</span>
+              <span className={isRaised ? 'text-yellow-100' : 'text-amber-300'}>
+                明注 {currentBet * 2}
+              </span>
+            </span>
+          </div>
 
           {/* 看牌按钮 */}
           {isPlaying && isAlive && !hasLooked && (

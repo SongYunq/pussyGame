@@ -5,6 +5,7 @@ export interface CalculatedSeatPosition {
   seatIndex: number;
   seat: TableSeat | null;
   isMe: boolean;
+  angleRad: number; // 座位在椭圆上的极坐标角度 (rad)
   xPercent: number; // 头像位置 X (0 ~ 100%)
   yPercent: number; // 头像位置 Y (0 ~ 100%)
   cardXPercent: number; // 手牌位置 X (0 ~ 100%，靠牌桌中央方向)
@@ -92,6 +93,7 @@ export function useTableLayout(seats: (TableSeat | null)[], myUserId: number) {
         seatIndex: item.seatIndex,
         seat: item.seat,
         isMe,
+        angleRad: angle,
         xPercent: Math.round(x * 100) / 100,
         yPercent: Math.round(y * 100) / 100,
         cardXPercent: Math.round(cardX * 100) / 100,

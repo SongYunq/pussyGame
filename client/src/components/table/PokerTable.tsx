@@ -1,9 +1,8 @@
 import React from 'react';
 import { RoomState } from '../../types/game';
-import { useTableLayout } from '../../hooks/useTableLayout';
+import { CalculatedSeatPosition, useTableLayout } from '../../hooks/useTableLayout';
 import { TableSeat } from './TableSeat';
 import { FlyingChipStack } from './FlyingChipStack';
-import { Coins } from 'lucide-react';
 import { FloatingBubble, FlyingChip } from '../../store/useGameStore';
 
 interface PokerTableProps {
@@ -15,6 +14,52 @@ interface PokerTableProps {
   flyingChips: FlyingChip[];
 }
 
+/**
+ * 计算每摞筹码在对应玩家面前的落点坐标：
+ * 筹码从玩家手牌前推向中间，但停留在靠近该玩家的内圈扇区（每排5摞，最多3排），
+ * 谁加注多、筹码垒得高且宽，一眼即可分辨。
+ */
+function getPlayerChipZoneCoords(
+  seatPos: CalculatedSeatPosition | undefined,
+  stackIndex: number
+): { endX: number; endY: number } {
+  if (!seatPos) {
+    return { endX: 50, endY: 58 };
+  }
+
+  const colOrder = [0, -1, 1, -2, 2];
+  const row = Math.floor(stackIndex / 5); // 0: 主排, 1: 靠中心前排, 2: 靠玩家后排
+  const col = colOrder[stackIndex % 5] ?? 0;
+
+  // 径向距离（距离中心 50%,50% 的椭圆半轴百分比）：既向中间推进，又明显靠近加注玩家一侧
+  const rowRadiusOffsets = [0, -3.2, 2.8];
+  const rOffset = rowRadiusOffsets[row] ?? 0;
+  // 偶数列轻微前后错落 0.5%，营造真实赌场推码的层次感
+  const stagger = Math.abs(col) % 2 === 1 ? -0.55 : 0;
+
+  const baseRx = seatPos.isMe ? 15.2 : 19.8;
+  const baseRy = seatPos.isMe ? 13.2 : 15.8;
+  const radialRx = baseRx + rOffset + stagger;
+  const radialRy = baseRy + rOffset * 0.82 + stagger;
+
+  const cosA = Math.cos(seatPos.angleRad);
+  const sinA = Math.sin(seatPos.angleRad);
+  // 切向单位向量（沿玩家座位前方的桌面弧线横向展开）
+  const tanX = -sinA;
+  const tanY = cosA;
+
+  const tangentStepX = 3.25;
+  const tangentStepY = 2.65;
+
+  const endX = 50 + radialRx * cosA + col * tangentStepX * tanX;
+  const endY = 50 + radialRy * sinA + col * tangentStepY * tanY;
+
+  return {
+    endX: Math.round(endX * 100) / 100,
+    endY: Math.round(endY * 100) / 100,
+  };
+}
+
 export const PokerTable: React.FC<PokerTableProps> = ({
   roomState,
   myUserId,
@@ -24,7 +69,6 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   flyingChips,
 }) => {
   const calculatedSeats = useTableLayout(roomState.seats, myUserId);
-  const hasIncomingChips = flyingChips.length > 0;
 
   return (
     <div className="relative w-full h-full flex items-center justify-center p-3 select-none overflow-hidden">
@@ -35,48 +79,22 @@ export const PokerTable: React.FC<PokerTableProps> = ({
           {/* 桌面暗色金线装饰椭圆 */}
           <div className="absolute inset-8 rounded-[140px] md:rounded-[200px] border border-amber-400/15 pointer-events-none" />
 
-          {/* 桌面中央底池与对局信息 */}
-          <div
-            className={`relative z-10 flex flex-col items-center justify-center p-3 rounded-2xl bg-black/40 backdrop-blur-sm border transition-all duration-300 shadow-2xl ${
-              hasIncomingChips
-                ? 'border-amber-400/70 shadow-[0_0_28px_rgba(251,191,36,0.35)] scale-[1.03]'
-                : 'border-amber-500/20'
-            }`}
-          >
-            {/* 轮数与状态标签 */}
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-500/30">
-                第 {roomState.currentRound} / 20 轮
-              </span>
-              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                底注: {roomState.baseAnte}
-              </span>
-            </div>
-
-            {/* 中央总奖池 */}
-            <div className="flex items-center gap-2 mt-1">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-300 flex items-center justify-center shadow-lg animate-pulse">
-                <Coins className="w-4 h-4 text-slate-950" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 font-bold tracking-wider">当前总底池</span>
-                <span className="text-xl md:text-2xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-200">
-                  {roomState.totalPot.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            {/* 当前单注基准 */}
-            <div className="text-[10px] text-amber-300/80 font-mono mt-1">
-              单注基准: <span className="font-bold text-amber-300">{roomState.currentBet}</span> (明注 {roomState.currentBet * 2})
-            </div>
+          {/* 正中央：仅保留无胶囊的总池金额 */}
+          <div className="relative z-20 pointer-events-none flex flex-col items-center justify-center">
+            <span className="text-[10px] font-bold tracking-widest text-amber-300/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+              总池
+            </span>
+            <span className="text-lg md:text-2xl font-black font-mono tracking-tight text-yellow-300 drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] [text-shadow:0_0_14px_rgba(250,204,21,0.55)]">
+              {roomState.totalPot.toLocaleString()}
+            </span>
           </div>
 
-          {/* 玩家身前出现并移向牌桌中央的立体筹码堆动画层 */}
+          {/* 玩家推向中间但停留在各自前方阵地的立体筹码堆层 */}
           {flyingChips.map((chip) => {
             const seatPos = calculatedSeats.find((s) => s.seatIndex === chip.fromSeatIndex);
             const startX = seatPos ? seatPos.chipXPercent : 50;
             const startY = seatPos ? seatPos.chipYPercent : 69;
+            const { endX, endY } = getPlayerChipZoneCoords(seatPos, chip.seatStackIndex ?? 0);
 
             return (
               <FlyingChipStack
@@ -84,8 +102,8 @@ export const PokerTable: React.FC<PokerTableProps> = ({
                 chip={chip}
                 startXPercent={startX}
                 startYPercent={startY}
-                endXPercent={50}
-                endYPercent={50}
+                endXPercent={endX}
+                endYPercent={endY}
               />
             );
           })}

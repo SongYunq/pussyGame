@@ -140,6 +140,7 @@ export const TableView: React.FC<TableViewProps> = ({
       <ActionPanel
         mySeat={mySeat}
         isMyTurn={isMyTurn}
+        baseAnte={roomState.baseAnte}
         currentBet={roomState.currentBet}
         currentRound={roomState.currentRound}
         gameStatus={roomState.gameStatus}

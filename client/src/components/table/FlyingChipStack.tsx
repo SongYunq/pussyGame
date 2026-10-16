@@ -107,8 +107,9 @@ export const FlyingChipStack: React.FC<FlyingChipStackProps> = ({
   endXPercent = 50,
   endYPercent = 50,
 }) => {
-  // 动画阶段：spawn (在玩家身前叠起) -> moving (推向牌桌中央) -> landing (汇入中央底池)
-  const [phase, setPhase] = useState<'spawn' | 'moving' | 'landing'>('spawn');
+  // 动画阶段：spawn (在玩家手牌前叠起) -> moving (推向该玩家前方下注区) -> settled (稳稳留在桌面上)
+  const [phase, setPhase] = useState<'spawn' | 'moving' | 'settled'>('spawn');
+  const [showImpactRing, setShowImpactRing] = useState(false);
 
   const effectiveAmount = chip.actualAmount ?? chip.chipValue;
   const chipCount = useMemo(
@@ -133,12 +134,12 @@ export const FlyingChipStack: React.FC<FlyingChipStackProps> = ({
     });
   }, [chipCount, chip.id, chip.actionType]);
 
-  // 落入中央区域时带一点微小的自然散布偏移
+  // 落入玩家专属阵地时带极微小的自然手工摆放偏移
   const targetCoords = useMemo(() => {
     const codeA = chip.id.charCodeAt(0) || 7;
     const codeB = chip.id.charCodeAt(1) || 13;
-    const offsetX = ((codeA % 7) - 3) * 0.75;
-    const offsetY = ((codeB % 7) - 3) * 0.65;
+    const offsetX = ((codeA % 5) - 2) * 0.22;
+    const offsetY = ((codeB % 5) - 2) * 0.18;
     return {
       x: endXPercent + offsetX,
       y: endYPercent + offsetY,
@@ -146,19 +147,26 @@ export const FlyingChipStack: React.FC<FlyingChipStackProps> = ({
   }, [chip.id, endXPercent, endYPercent]);
 
   useEffect(() => {
-    // 阶段1：先在玩家前方快速叠起一落筹码并短暂停留展示高度 (320ms)
+    // 阶段1：先在玩家手牌前快速叠起一落筹码并短暂展示高度 (260ms)
     const moveTimer = setTimeout(() => {
       setPhase('moving');
-    }, 320);
+    }, 260);
 
-    // 阶段2：平滑推向牌桌中央后触发汇入动效 (320ms + 720ms = 1040ms)
-    const landTimer = setTimeout(() => {
-      setPhase('landing');
-    }, 1040);
+    // 阶段2：平滑推向玩家面前阵地后落定保留在桌面上 (260ms + 660ms = 920ms)
+    const settleTimer = setTimeout(() => {
+      setPhase('settled');
+      setShowImpactRing(true);
+    }, 920);
+
+    // 落定光圈短暂闪烁后收敛，筹码柱继续留在桌面
+    const ringTimer = setTimeout(() => {
+      setShowImpactRing(false);
+    }, 1350);
 
     return () => {
       clearTimeout(moveTimer);
-      clearTimeout(landTimer);
+      clearTimeout(settleTimer);
+      clearTimeout(ringTimer);
     };
   }, []);
 
@@ -166,49 +174,50 @@ export const FlyingChipStack: React.FC<FlyingChipStackProps> = ({
   const currentY = phase === 'spawn' ? startYPercent : targetCoords.y;
 
   // 每层筹码垂直向上堆叠的像素步长
-  const stepY = 3.5;
+  const stepY = 3.2;
   const stackHeightPx = (chipCount - 1) * stepY + 20;
   const topPalette = layers[layers.length - 1]?.palette || CHIP_PALETTES.gold;
 
+  // 根据 Y 轴位置计算 2.5D 景深层级（越靠屏幕下方的筹码堆层级越高，符合真实俯视遮挡关系）
+  const depthZIndex = Math.min(29, Math.max(12, Math.round(currentY / 4) + 10));
+
   return (
     <div
-      className="absolute z-30 pointer-events-none select-none"
+      className="absolute pointer-events-none select-none"
       style={{
         left: `${currentX}%`,
         top: `${currentY}%`,
-        transform:
-          phase === 'landing'
-            ? 'translate(-50%, -50%) scale(0.82)'
-            : 'translate(-50%, -50%) scale(1)',
-        opacity: phase === 'landing' ? 0 : 1,
+        zIndex: depthZIndex,
+        transform: 'translate(-50%, -50%) scale(1)',
+        opacity: 1,
         transition:
-          'left 720ms cubic-bezier(0.22, 1, 0.36, 1), top 720ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms ease-out, opacity 280ms ease-in',
+          'left 660ms cubic-bezier(0.22, 1, 0.36, 1), top 660ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms ease-out',
       }}
     >
       {/* 筹码堆容器（以底座中心为锚点，向上生长） */}
       <div
         className="relative flex items-center justify-center"
         style={{
-          width: '44px',
-          height: '22px',
+          width: '40px',
+          height: '20px',
         }}
       >
         {/* 桌面毛呢接触面立体投影与高额加注光晕 */}
         <div
           className="absolute inset-x-0.5 bottom-0 h-5 rounded-full transition-all duration-500"
           style={{
-            background: `radial-gradient(ellipse at center, rgba(0,0,0,0.75) 25%, ${topPalette.glow} 65%, transparent 100%)`,
+            background: `radial-gradient(ellipse at center, rgba(0,0,0,0.82) 28%, ${topPalette.glow} 68%, transparent 100%)`,
             transform: `scale(${chipCount >= 20 ? 1.25 : 1.05}) translateY(3px)`,
             filter: 'blur(2px)',
           }}
         />
 
-        {/* 到达中央底池瞬间的金色波纹扩散 */}
-        {phase === 'landing' && (
+        {/* 筹码推入阵地落定瞬间的金色波纹 */}
+        {showImpactRing && (
           <div
             className="absolute inset-0 rounded-full border-2 border-amber-300/80 animate-ping"
             style={{
-              boxShadow: '0 0 18px rgba(251, 191, 36, 0.7)',
+              boxShadow: '0 0 16px rgba(251, 191, 36, 0.7)',
             }}
           />
         )}
