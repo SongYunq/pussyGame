@@ -27,4 +27,3 @@
 * [前端专属设计需求与交互规范](docs/frontend_requirements.md)
 * [后端专属设计需求与架构规范](docs/backend_requirements.md)
 * [前后端通信协议规范 (API & WebSocket Spec)](docs/api_specification.md)
-* [整体实现计划全景](docs/implementation_plan.md)

@@ -10,7 +10,7 @@
 3. [RESTful HTTP API 规范](#三-restful-http-api-规范)
    - [3.1 鉴权与用户基础模块](#31-鉴权与用户基础模块)
    - [3.2 个人资料与账本流水模块](#32-个人资料与账本流水模块)
-   - [3.3 房主/管理员后台专区 (`/api/admin`)](#33-房主管理员后台专区-apiadmin)
+   - [3.3 超级管理员后台专区 (`/api/admin`)](#33-超级管理员后台专区-apiadmin)
 4. [WebSocket (Socket.io) 实时对局协议规范](#四-websocket-socketio-实时对局协议规范)
    - [4.1 连接鉴权与生命周期](#41-连接鉴权与生命周期)
    - [4.2 房间与大厅信令 (Room & Lobby)](#42-房间与大厅信令-room--lobby)
@@ -184,7 +184,7 @@ interface ApiResponse<T = any> {
 
 ---
 
-### 3.3 房主/管理员后台专区 (`/api/admin`)
+### 3.3 超级管理员后台专区 (`/api/admin`)
 *提示：以下接口必须验证当前用户的 JWT 具备 `role: "admin"` 权限。*
 
 #### 1. 管理员开通新用户账号
@@ -284,6 +284,154 @@ interface ApiResponse<T = any> {
 #### 5. 获取全局审计流水日志
 * **路径**：`GET /api/admin/audit-logs?page=1&pageSize=50`
 * **响应数据**：返回包括管理员充减、对局赢家胜出等在内的全局所有资金变动记录。
+
+#### 6. 删除玩家账号
+* **路径**：`DELETE /api/admin/users/:id`
+* **说明**：管理员删除玩家账号及其关联对局资产记录（主管理员 `admin` 禁止删除）。
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "账号删除成功"
+}
+```
+
+#### 7. 编辑玩家账号资料与权限
+* **路径**：`PUT /api/admin/users/:id`
+* **请求体**：
+```json
+{
+  "nickname": "绝世赌神张三(已更名)",
+  "avatar": "👑",
+  "role": "player",        // "player" | "admin"
+  "isBanned": false        // true 表示封禁禁止进入游戏
+}
+```
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "资料更新成功",
+  "data": {
+    "id": 1,
+    "username": "zhangsan",
+    "nickname": "绝世赌神张三(已更名)",
+    "avatar": "👑",
+    "role": "player",
+    "isBanned": false
+  }
+}
+```
+
+#### 8. 获取充值与调账流水专账记录
+* **路径**：`GET /api/admin/chips/logs?page=1&pageSize=50`
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "list": [
+      {
+        "id": 1001,
+        "userId": 1,
+        "username": "zhangsan",
+        "amount": 5000,
+        "balanceAfter": 10000,
+        "reason": "老友微信转账充值",
+        "operator": "admin",
+        "type": "recharge",
+        "createdAt": "2026-10-13 21:30:00"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+#### 9. 获取当前发牌算法调控配置
+* **路径**：`GET /api/admin/algorithm/config`
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "mode": "fair",              // "fair" | "action_boost" | "beginner_favor" | "custom"
+    "leopardWeight": 1.0,        // 豹子权重系数 (0.1 ~ 5.0)
+    "straightFlushWeight": 1.0,  // 顺金权重系数 (0.1 ~ 5.0)
+    "flushWeight": 1.0,          // 金花权重系数 (0.1 ~ 4.0)
+    "straightWeight": 1.0,       // 顺子权重系数 (0.1 ~ 3.0)
+    "pairWeight": 1.0,           // 对子权重系数 (0.1 ~ 2.0)
+    "highCardWeight": 1.0,       // 散牌权重系数 (0.1 ~ 2.0)
+    "clashRate": 25,             // 强强碰撞率 (0 ~ 100%)
+    "special235Boost": 1.0,      // 特殊235逆袭杀豹子权重 (0.1 ~ 5.0)
+    "playerLuckWeights": {}      // 用户ID -> 幸运加权 (-50 ~ +50)
+  }
+}
+```
+
+#### 10. 保存发牌算法调控配置
+* **路径**：`POST /api/admin/algorithm/config`
+* **请求体**：
+```json
+{
+  "mode": "action_boost",
+  "leopardWeight": 2.2,
+  "straightFlushWeight": 2.0,
+  "flushWeight": 1.8,
+  "straightWeight": 1.5,
+  "pairWeight": 1.0,
+  "highCardWeight": 0.8,
+  "clashRate": 50,
+  "special235Boost": 2.5,
+  "playerLuckWeights": {
+    "1": 15
+  }
+}
+```
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "发牌算法调控参数保存成功并已立即生效"
+}
+```
+
+#### 11. 执行发牌算法蒙特卡洛仿真模拟测试
+* **路径**：`POST /api/admin/algorithm/simulate`
+* **请求体**：
+```json
+{
+  "rounds": 1000,
+  "config": {
+    "leopardWeight": 2.0,
+    "straightFlushWeight": 1.8,
+    "flushWeight": 1.5,
+    "straightWeight": 1.2,
+    "pairWeight": 1.0,
+    "highCardWeight": 0.8
+  }
+}
+```
+* **响应数据**：
+```json
+{
+  "code": 200,
+  "message": "仿真模拟计算完成",
+  "data": {
+    "totalRounds": 1000,
+    "stats": {
+      "leopard": { "count": 5, "percentage": 0.5 },
+      "straightFlush": { "count": 4, "percentage": 0.4 },
+      "flush": { "count": 72, "percentage": 7.2 },
+      "straight": { "count": 41, "percentage": 4.1 },
+      "pair": { "count": 182, "percentage": 18.2 },
+      "highCard": { "count": 696, "percentage": 69.6 }
+    }
+  }
+}
+```
 
 ---
 

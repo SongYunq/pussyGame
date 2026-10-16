@@ -1,27 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import { LoginView } from './views/LoginView';
 import { LobbyView } from './views/LobbyView';
 import { TableView } from './views/TableView';
 import { AdminDashboard } from './views/AdminDashboard';
 import { LedgerDrawer } from './views/LedgerDrawer';
+import { UserProfile } from './types/game';
 
 type ViewMode = 'login' | 'lobby' | 'table' | 'admin';
 
 export const App: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
-  const [currentView, setCurrentView] = useState<ViewMode>(isAuthenticated ? 'table' : 'login');
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const [currentView, setCurrentView] = useState<ViewMode>(() => {
+    if (!isAuthenticated) return 'login';
+    if (user?.role === 'admin') return 'admin';
+    return 'table';
+  });
   const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+
+  // 超级管理员账号纯管理系统运作，完全隔离牌桌与大厅
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin' && currentView !== 'admin') {
+      setCurrentView('admin');
+    }
+  }, [isAuthenticated, user, currentView]);
+
+  const handleLoginSuccess = (loggedInUser: UserProfile) => {
+    if (loggedInUser.role === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('table');
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentView('login');
+  };
 
   // 未登录时强制显示登录视图
   if (!isAuthenticated && currentView !== 'login') {
-    return <LoginView onLoginSuccess={() => setCurrentView('table')} />;
+    return <LoginView onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
-    <div className="h-full w-full bg-slate-950 font-sans antialiased text-slate-100">
+    <div className="h-full w-full bg-slate-950 font-sans antialiased text-slate-100 overflow-hidden flex flex-col">
       {currentView === 'login' && (
-        <LoginView onLoginSuccess={() => setCurrentView('table')} />
+        <LoginView onLoginSuccess={handleLoginSuccess} />
       )}
 
       {currentView === 'lobby' && (
@@ -36,12 +61,13 @@ export const App: React.FC = () => {
         <TableView
           onBackToLobby={() => setCurrentView('lobby')}
           onOpenLedger={() => setIsLedgerOpen(true)}
-          onOpenAdmin={() => setCurrentView('admin')}
         />
       )}
 
       {currentView === 'admin' && (
-        <AdminDashboard onBack={() => setCurrentView('table')} />
+        <AdminDashboard
+          onLogout={handleLogout}
+        />
       )}
 
       {/* 全局个人流水战绩抽屉 */}

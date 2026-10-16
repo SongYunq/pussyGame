@@ -4,8 +4,10 @@ import { useGameStore } from '../store/useGameStore';
 import { api } from '../services/api';
 import { Sparkles, Lock, User, ArrowRight } from 'lucide-react';
 
+import { UserProfile } from '../types/game';
+
 interface LoginViewProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: UserProfile) => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
@@ -26,12 +28,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       const res = await api.login(username, password);
       login(res.token, res.user);
       setCurrentUser(res.user);
-      onLoginSuccess();
+      onLoginSuccess(res.user);
     } catch {
       // 若后端尚未启动或处于纯前端模式，提供安全回退快速进入
       console.warn('后端服务未连接，使用离线模拟身份进入大厅');
-      const fallbackUser = {
-        id: 1,
+      const fallbackUser: UserProfile = {
+        id: username === 'admin' ? 999 : 1,
         username: username || 'player1',
         nickname: username === 'admin' ? '系统管理员' : '老友牌神',
         avatar: username === 'admin' ? '🛡️' : '👑',
@@ -40,7 +42,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       };
       login('mock_jwt_token', fallbackUser);
       setCurrentUser(fallbackUser);
-      onLoginSuccess();
+      onLoginSuccess(fallbackUser);
     } finally {
       setLoading(false);
     }
@@ -124,13 +126,35 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </form>
 
         {/* 快捷测试账号说明卡片 */}
-        <div className="mt-6 p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex flex-col gap-1">
+        <div className="mt-6 p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex flex-col gap-2">
           <div className="flex items-center gap-1 text-amber-400 font-bold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>开发者体验账号提示：</span>
+            <span>开发者体验账号（点击一键填入）：</span>
           </div>
-          <div>• 玩家账号：<code className="text-slate-200">zhangsan</code> / 密码：<code className="text-slate-200">user123456</code></div>
-          <div>• 管理员账号：<code className="text-slate-200">admin</code> / 密码：<code className="text-slate-200">admin123456</code></div>
+          <div className="flex items-center justify-between bg-slate-900/60 hover:bg-slate-800/60 p-2 rounded-lg cursor-pointer transition border border-slate-800/80"
+            onClick={() => {
+              setUsername('admin');
+              setPassword('admin123456');
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-amber-400 font-bold">🛡️ 管理员后台：</span>
+              <code className="text-slate-200 font-mono">admin</code> / <code className="text-slate-300 font-mono">admin123456</code>
+            </div>
+            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-bold">填入管理员</span>
+          </div>
+          <div className="flex items-center justify-between bg-slate-900/60 hover:bg-slate-800/60 p-2 rounded-lg cursor-pointer transition border border-slate-800/80"
+            onClick={() => {
+              setUsername('zhangsan');
+              setPassword('user123456');
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-emerald-400 font-bold">👤 普通玩家：</span>
+              <code className="text-slate-200 font-mono">zhangsan</code> / <code className="text-slate-300 font-mono">user123456</code>
+            </div>
+            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">填入玩家</span>
+          </div>
         </div>
       </div>
     </div>
