@@ -60,6 +60,7 @@ export interface UserRecord {
   id: number;
   username: string;
   password_hash: string;
+  auth_version: number;
   nickname: string;
   avatar: string;
   balance: number;
@@ -91,4 +92,5 @@ export interface JwtPayload {
   userId: number;
   username: string;
   role: 'player' | 'admin';
+  authVersion?: number;
 }

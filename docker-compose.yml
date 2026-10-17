@@ -12,10 +12,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - JWT_SECRET=zhajinhua-prod-secret-2026
-      - ADMIN_USER=admin
-      - ADMIN_PASS=admin123
+      - JWT_SECRET=${JWT_SECRET:?必须设置随机 JWT_SECRET（至少32字节）}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:?必须设置管理员密码 ADMIN_PASS}
       - DB_PATH=/app/server/data/game.db
-      - CLIENT_DIST_PATH=../client/dist
+      - CLIENT_DIST_PATH=/app/client/dist
     volumes:
       - ./server/data:/app/server/data

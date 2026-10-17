@@ -1,6 +1,20 @@
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db/database.js';
 import { UserRecord } from '../types/index.js';
+import { isPassword, isTrimmedText } from '../utils/inputValidation.js';
+
+type BalanceChangeType = 'recharge' | 'deduct' | 'ante' | 'bet' | 'game_win';
+
+interface BalanceContext {
+  operatorId?: number;
+  roomId?: string;
+}
+
+function validateOperator(operatorId?: number): void {
+  if (operatorId !== undefined && (!Number.isSafeInteger(operatorId) || operatorId <= 0)) {
+    throw new Error('经办用户ID无效');
+  }
+}
 
 export class UserModel {
   static findById(id: number): UserRecord | null {
@@ -21,8 +35,16 @@ export class UserModel {
     nickname: string,
     avatar: string = 'avatar_1.png',
     initialChips: number = 0,
-    role: 'player' | 'admin' = 'player'
+    role: 'player' | 'admin' = 'player',
+    operatorId?: number
   ): { id: number; username: string; balance: number } {
+    if (!isTrimmedText(username, 64) || !isPassword(passwordPlain) ||
+        !isTrimmedText(nickname, 40) || !isTrimmedText(avatar, 256) ||
+        !Number.isFinite(initialChips) || initialChips < 0 || initialChips > Number.MAX_SAFE_INTEGER ||
+        !['player', 'admin'].includes(role)) {
+      throw new Error('账号资料或初始筹码无效');
+    }
+    validateOperator(operatorId);
     const db = getDb();
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(passwordPlain, salt);
@@ -31,36 +53,40 @@ export class UserModel {
       const result = db.prepare(`
         INSERT INTO users (username, password_hash, nickname, avatar, balance, role)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(username, passwordHash, nickname, avatar, initialChips, role);
+      `).run(username.trim(), passwordHash, nickname.trim(), avatar.trim(), initialChips, role);
 
       const userId = Number(result.lastInsertRowid);
 
       if (initialChips > 0) {
         db.prepare(`
-          INSERT INTO ledgers (user_id, type, amount, balance_after, description)
-          VALUES (?, 'recharge', ?, ?, '管理员开号赠送初始筹码')
-        `).run(userId, initialChips, initialChips);
+          INSERT INTO ledgers (user_id, type, amount, balance_after, description, operator_id)
+          VALUES (?, 'recharge', ?, ?, '管理员开号赠送初始筹码', ?)
+        `).run(userId, initialChips, initialChips, operatorId ?? null);
       }
 
-      return { id: userId, username, balance: initialChips };
+      return { id: userId, username: username.trim(), balance: initialChips };
     });
 
     return transaction();
   }
 
   static updateProfile(userId: number, nickname?: string, avatar?: string): { nickname: string; avatar: string } {
+    if ((nickname !== undefined && !isTrimmedText(nickname, 40)) ||
+        (avatar !== undefined && !isTrimmedText(avatar, 256))) {
+      throw new Error('昵称或头像无效');
+    }
     const db = getDb();
     const user = this.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
     }
 
-    const newNickname = nickname || user.nickname;
-    const newAvatar = avatar || user.avatar;
+    const newNickname = nickname === undefined ? user.nickname : nickname.trim();
+    const newAvatar = avatar === undefined ? user.avatar : avatar.trim();
 
     db.prepare(`
-      UPDATE users 
-      SET nickname = ?, avatar = ?, updated_at = CURRENT_TIMESTAMP 
+      UPDATE users
+      SET nickname = ?, avatar = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(newNickname, newAvatar, userId);
 
@@ -68,13 +94,14 @@ export class UserModel {
   }
 
   static resetPassword(userId: number, newPasswordPlain: string): void {
+    if (!isPassword(newPasswordPlain)) throw new Error('新密码格式无效');
     const db = getDb();
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(newPasswordPlain, salt);
 
     const result = db.prepare(`
-      UPDATE users 
-      SET password_hash = ?, updated_at = CURRENT_TIMESTAMP 
+      UPDATE users
+      SET password_hash = ?, auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(passwordHash, userId);
 
@@ -83,13 +110,13 @@ export class UserModel {
     }
   }
 
-  static getAllUsers(): Array<Omit<UserRecord, 'password_hash'>> {
+  static getAllUsers(): Array<Omit<UserRecord, 'password_hash' | 'auth_version'>> {
     const db = getDb();
     const rows = db.prepare(`
       SELECT id, username, nickname, avatar, balance, role, created_at, updated_at
       FROM users
       ORDER BY id ASC
-    `).all() as Array<Omit<UserRecord, 'password_hash'>>;
+    `).all() as Array<Omit<UserRecord, 'password_hash' | 'auth_version'>>;
     return rows;
   }
 
@@ -103,9 +130,24 @@ export class UserModel {
   static changeBalance(
     userId: number,
     amount: number,
-    type: 'recharge' | 'deduct' | 'ante' | 'bet' | 'game_win',
-    description: string
+    type: BalanceChangeType,
+    description: string,
+    context: BalanceContext = {}
   ): { balance: number } {
+    if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isFinite(amount) ||
+        amount === 0 || Math.abs(amount) > Number.MAX_SAFE_INTEGER ||
+        !isTrimmedText(description, 500)) {
+      throw new Error('余额变动参数无效');
+    }
+    const credit = type === 'recharge' || type === 'game_win';
+    const debit = type === 'deduct' || type === 'ante' || type === 'bet';
+    if ((!credit && !debit) || (credit && amount < 0) || (debit && amount > 0)) {
+      throw new Error('流水类型与金额方向不一致');
+    }
+    validateOperator(context.operatorId);
+    if (context.roomId !== undefined && !isTrimmedText(context.roomId, 64)) {
+      throw new Error('流水房间编号无效');
+    }
     const db = getDb();
 
     const transaction = db.transaction(() => {
@@ -117,21 +159,27 @@ export class UserModel {
         throw new Error('用户不存在');
       }
 
+      if (!Number.isFinite(user.balance) || user.balance < 0 || user.balance > Number.MAX_SAFE_INTEGER) {
+        throw new Error('账户余额数据无效');
+      }
       const newBalance = user.balance + amount;
       if (newBalance < 0) {
         throw new Error('筹码余额不足');
       }
+      if (!Number.isFinite(newBalance) || newBalance > Number.MAX_SAFE_INTEGER || newBalance === user.balance) {
+        throw new Error('余额超出可支持的数值范围');
+      }
 
       db.prepare(`
-        UPDATE users 
-        SET balance = ?, updated_at = CURRENT_TIMESTAMP 
+        UPDATE users
+        SET balance = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(newBalance, userId);
 
       db.prepare(`
-        INSERT INTO ledgers (user_id, type, amount, balance_after, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(userId, type, amount, newBalance, description);
+        INSERT INTO ledgers (user_id, type, amount, balance_after, description, operator_id, room_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(userId, type, amount, newBalance, description, context.operatorId ?? null, context.roomId ?? null);
 
       return { balance: newBalance };
     });

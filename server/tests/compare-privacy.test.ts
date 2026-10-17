@@ -12,7 +12,7 @@ const hands: Card[][] = [
 ];
 
 beforeAll(() => {
-  for (let i = 0; i < 4; i++) playerIds.push(UserModel.createUser(`compare_privacy_${i}`, 'pass', `私密比牌${i}`, 'avatar', 10000).id);
+  for (let i = 0; i < 4; i++) playerIds.push(UserModel.createUser(`compare_privacy_${i}`, 'pass123', `私密比牌${i}`, 'avatar', 10000).id);
 });
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });

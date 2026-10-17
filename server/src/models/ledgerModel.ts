@@ -13,12 +13,24 @@ export interface AuditLogItem extends LedgerItem {
   userId: number;
   username: string;
   nickname: string;
+  operatorId: number | null;
+  operatorUsername: string | null;
+  roomId: string | null;
+}
+
+function getOffset(page: number, pageSize: number): number {
+  const offset = (page - 1) * pageSize;
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) ||
+      pageSize < 1 || pageSize > 100 || !Number.isSafeInteger(offset)) {
+    throw new Error('分页参数无效');
+  }
+  return offset;
 }
 
 export class LedgerModel {
   static getUserLedger(userId: number, page: number = 1, pageSize: number = 20): { list: LedgerItem[]; total: number } {
     const db = getDb();
-    const offset = Math.max(0, (page - 1) * pageSize);
+    const offset = getOffset(page, pageSize);
 
     const totalRow = db.prepare('SELECT COUNT(*) as count FROM ledgers WHERE user_id = ?').get(userId) as { count: number };
     const total = totalRow ? totalRow.count : 0;
@@ -36,7 +48,7 @@ export class LedgerModel {
 
   static getAuditLogs(page: number = 1, pageSize: number = 50): { list: AuditLogItem[]; total: number } {
     const db = getDb();
-    const offset = Math.max(0, (page - 1) * pageSize);
+    const offset = getOffset(page, pageSize);
 
     const totalRow = db.prepare('SELECT COUNT(*) as count FROM ledgers').get() as { count: number };
     const total = totalRow ? totalRow.count : 0;
@@ -47,6 +59,9 @@ export class LedgerModel {
         l.user_id as userId,
         u.username,
         u.nickname,
+        l.operator_id as operatorId,
+        operator.username as operatorUsername,
+        l.room_id as roomId,
         l.type,
         l.amount,
         l.balance_after as balanceAfter,
@@ -54,6 +69,7 @@ export class LedgerModel {
         l.created_at as createdAt
       FROM ledgers l
       LEFT JOIN users u ON l.user_id = u.id
+      LEFT JOIN users operator ON l.operator_id = operator.id
       ORDER BY l.id DESC
       LIMIT ? OFFSET ?
     `).all(pageSize, offset) as AuditLogItem[];

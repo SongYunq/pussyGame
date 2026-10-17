@@ -21,15 +21,29 @@ export function setupSocketHandler(io: Server): void {
     (socket as any).userId = payload.userId;
     (socket as any).username = payload.username;
     (socket as any).role = payload.role;
+    socket.data.authToken = token;
     next();
   });
 
   // 2. 连接生命周期与事件注册
   io.on('connection', (socket: Socket) => {
     const userId = (socket as any).userId as number;
-    const username = (socket as any).username as string;
+    RoomManager.recordUserOnline(userId, socket.id, () => { socket.disconnect(true); });
 
-    RoomManager.recordUserOnline(userId, socket.id);
+    // 长连接不能在握手后永久沿用旧权限；每次动作重新核对凭据与账号版本。
+    socket.use((packet, next) => {
+      const payload = verifyToken(socket.data.authToken);
+      if (!payload || payload.userId !== userId) {
+        const callback = packet[packet.length - 1];
+        const error = { code: 401, message: '身份凭据无效或已过期，请重新登录' };
+        if (typeof callback === 'function') callback(error);
+        else socket.emit('error', error);
+        socket.disconnect(true);
+        return;
+      }
+      (socket as any).role = payload.role;
+      next();
+    });
 
     // 检查是否有未退出的房间（断线重连恢复）
     const existingRoom = RoomManager.findRoomByUserId(userId);
@@ -51,9 +65,10 @@ export function setupSocketHandler(io: Server): void {
       const room = RoomManager.findRoomByUserId(userId);
       if (room) {
         // 若仅在观战席，离开房间并清除
-        if (room.spectators.has(userId)) {
+        if (room.spectators.has(userId) && !RoomManager.getUserOnlineStatus(userId).isOnline) {
           room.removeSpectator(userId);
           room.broadcastState();
+          RoomManager.removeEmptyRoom(room.roomId);
         }
         // 保留座位与牌面等待重连；限时房间继续倒计时，无限制房间等待手动操作
       }

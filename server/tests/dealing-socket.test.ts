@@ -55,7 +55,7 @@ it('deals server-configured guarantees to two authenticated clients and broadcas
   const config = defaultAlgorithmConfig(); config.deckProbabilities = { standard: 100, short: 0 }; config.standardModes = { random: 0, rival: 0, guarantee: 100 };
   AlgorithmModel.saveConfig(config);
   for (let i = 0; i < 2; i++) {
-    const user = UserModel.createUser(`socket_deal_${i}`, 'pass', `联机${i}`, 'avatar', 1000);
+    const user = UserModel.createUser(`socket_deal_${i}`, 'pass123', `联机${i}`, 'avatar', 1000);
     const token = signToken({ userId: user.id, username: user.username, role: 'player' });
     const client = io(url, { auth: { token }, transports: ['websocket'], autoConnect: false });
     clients.push(client);
@@ -86,7 +86,7 @@ it('deals server-configured guarantees to two authenticated clients and broadcas
 it('sends loser cards only to the direct winner, including other tabs and reconnects', async () => {
   const players: Array<{ client: Socket; token: string; id: number }> = [];
   for (let i = 0; i < 5; i++) {
-    const user = UserModel.createUser(`socket_private_${i}`, 'pass', `私密比牌${i}`, 'avatar', 1000);
+    const user = UserModel.createUser(`socket_private_${i}`, 'pass123', `私密比牌${i}`, 'avatar', 1000);
     const token = signToken({ userId: user.id, username: user.username, role: 'player' });
     const client = io(url, { auth: { token }, transports: ['websocket'], autoConnect: false });
     clients.push(client);
@@ -155,7 +155,7 @@ it('sends loser cards only to the direct winner, including other tabs and reconn
 it('preserves unlimited thinking time through real room creation, turns and reconnection', async () => {
   const players: Array<{ client: Socket; token: string; id: number }> = [];
   for (let i = 0; i < 2; i++) {
-    const user = UserModel.createUser(`socket_unlimited_${i}`, 'pass', `不限时玩家${i}`, 'avatar', 1000);
+    const user = UserModel.createUser(`socket_unlimited_${i}`, 'pass123', `不限时玩家${i}`, 'avatar', 1000);
     const token = signToken({ userId: user.id, username: user.username, role: 'player' });
     const client = io(url, { auth: { token }, transports: ['websocket'], autoConnect: false });
     clients.push(client);

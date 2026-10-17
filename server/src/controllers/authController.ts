@@ -3,19 +3,20 @@ import bcrypt from 'bcryptjs';
 import { AuthRequest } from '../middlewares/authMiddleware.js';
 import { UserModel } from '../models/userModel.js';
 import { signToken } from '../utils/jwt.js';
+import { isPassword, isRequestBody, isTrimmedText } from '../utils/inputValidation.js';
 
 export class AuthController {
   static async login(req: AuthRequest, res: Response): Promise<void> {
-    const { username, password } = req.body;
-    if (!username || !password) {
+    if (!isRequestBody(req.body) || !isTrimmedText(req.body.username, 64) || !isPassword(req.body.password, 1)) {
       res.status(400).json({
         code: 400,
-        message: '用户名和密码不能为空',
+        message: '用户名或密码格式无效',
         data: null,
       });
       return;
     }
 
+    const { username, password } = req.body;
     const user = UserModel.findByUsername(username.trim());
     if (!user) {
       res.status(400).json({
@@ -40,6 +41,7 @@ export class AuthController {
       userId: user.id,
       username: user.username,
       role: user.role,
+      authVersion: user.auth_version,
     });
 
     res.json({
