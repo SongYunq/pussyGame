@@ -17,7 +17,7 @@ export class RoomManager {
       roomId,
       roomName: roomName || `${roomId} 房间`,
       baseAnte: Math.max(1, baseAnte),
-      turnSeconds: Math.max(10, Math.min(60, turnSeconds)),
+      turnSeconds: turnSeconds === 0 ? 0 : Math.max(10, Math.min(60, turnSeconds)),
       io,
     });
 

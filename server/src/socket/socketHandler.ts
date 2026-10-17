@@ -55,7 +55,7 @@ export function setupSocketHandler(io: Server): void {
           room.removeSpectator(userId);
           room.broadcastState();
         }
-        // 若在桌位上，保留桌位与牌面，等待重连；超时由倒计时自动判负/弃牌
+        // 保留座位与牌面等待重连；限时房间继续倒计时，无限制房间等待手动操作
       }
     });
   });

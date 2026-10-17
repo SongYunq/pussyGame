@@ -15,7 +15,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onOpenAdmin,
 }) => {
   const { user, logout } = useAuthStore();
-  const { isMuted, toggleMute, updateRoomState, roomState } = useGameStore();
+  const { isMuted, toggleMute, createMockRoom } = useGameStore();
 
   const [inputRoomId, setInputRoomId] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -34,16 +34,13 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    const generatedId = Math.floor(1000 + Math.random() * 9000).toString();
-    updateRoomState({
-      ...roomState,
-      roomId: generatedId,
+    const roomId = createMockRoom({
       roomName: newRoomName,
       baseAnte: newBaseAnte,
       turnSeconds: newTurnSeconds,
     });
     setShowCreateModal(false);
-    onEnterRoom(generatedId);
+    onEnterRoom(roomId);
   };
 
   return (
@@ -155,7 +152,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                 <PlusCircle className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-100">创建专属私局</h3>
-              <p className="text-xs text-slate-400 mt-1">自由配置底注基准与思考倒计时</p>
+              <p className="text-xs text-slate-400 mt-1">自由配置底注与思考时间</p>
             </div>
 
             <button
@@ -224,10 +221,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">
-                  每轮出牌倒计时 (秒)
+                  每轮思考时间
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[15, 20, 30, 60].map((sec) => (
+                <div className="grid grid-cols-5 gap-2">
+                  {[15, 20, 30, 60, 0].map((sec) => (
                     <button
                       type="button"
                       key={sec}
@@ -238,10 +235,13 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                           : 'border-slate-800 bg-slate-950 text-slate-400'
                       }`}
                     >
-                      {sec}s
+                      {sec === 0 ? '无限制' : `${sec}s`}
                     </button>
                   ))}
                 </div>
+                {newTurnSeconds === 0 && (
+                  <p className="mt-2 text-[11px] text-slate-400">不设倒计时，不会因超时自动弃牌</p>
+                )}
               </div>
 
               <div className="mt-4 flex gap-2">

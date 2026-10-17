@@ -6,7 +6,7 @@ export function registerRoomEvents(io: Server, socket: Socket): void {
   const userId = (socket as any).userId as number;
 
   // 1. 创建房间
-  socket.on('room:create', (data: { roomName: string; baseAnte: number; turnSeconds: number }, callback) => {
+  socket.on('room:create', (data: { roomName: string; baseAnte: number; turnSeconds?: number }, callback) => {
     try {
       const room = RoomManager.createRoom(data.roomName, data.baseAnte, data.turnSeconds, io);
       socket.join(`room:${room.roomId}`);

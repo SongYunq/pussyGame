@@ -623,6 +623,8 @@ export class Room {
    */
   private startTurnTimer(): void {
     this.clearTurnTimer();
+    if (this.turnSeconds === 0) return;
+
     const durationMs = this.turnSeconds * 1000;
     this.turnDeadline = Date.now() + durationMs;
 

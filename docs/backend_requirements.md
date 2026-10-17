@@ -251,7 +251,7 @@ static changeBalance(
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │ 2. 牌局对决阶段 (gameStatus: 'playing')                │
-│    - 轮流出资 (turnSeconds 倒计时, 超时自动弃牌)       │
+│    - 轮流出资 (支持限时或无限制，限时才超时弃牌)       │
 │    - 玩家动作: 看牌 (look) / 跟注 (call) / 加注(raise) │
 │    - 发起 PK 比牌 (compare, 第 2 轮起)                 │
 │    - 弃牌 (fold, 手动或超时)                           │
@@ -314,9 +314,11 @@ export type PlayerTableStatus =
 5. **胜者检查**：若淘汰后场上仅剩 1 名存活玩家，立即收官派奖。
 
 ### 4.6 倒计时控制器与断线超时防挂机
-* 每次轮到玩家操作，服务端根据房间设置的 `turnSeconds`（默认 20 秒）生成 `turnDeadline = Date.now() + turnSeconds * 1000` 并挂载 `setTimeout`；
-* 倒计时结束玩家仍未操作，服务端自动代为执行 `fold(userId, 'timeout')`，保障牌桌绝不会因为个别玩家掉线、切后台或恶意挂机而卡死；
-* 若玩家中途刷新或重连连入，倒计时不重置，客户端无缝恢复剩余倒计时。
+* 创建房间时 `turnSeconds` 默认为 20 秒；非零值继续限制在 10～60 秒，`0` 为独立的“无限制”设置，由 `RoomManager.createRoom` 原样保留。
+* 限时房间：每次轮到玩家操作，根据 `turnSeconds` 生成 `turnDeadline = Date.now() + turnSeconds * 1000` 并挂载 `setTimeout`；到期未操作时执行 `fold(userId, 'timeout')`。
+* 无限制房间：`Room.startTurnTimer` 清理旧定时器后直接返回，`turnDeadline` 始终为 `null`，不注册自动弃牌任务；开局、每次轮换及下一局均遵守该设置。
+* 刷新或重连不会重置限时房间的截止时间；无限制房间重连时仍广播 `turnSeconds: 0`、`turnDeadline: null`，保留座位和手牌，等待玩家手动操作，不因断线自动弃牌。
+* 无限制只取消回合时间限制，不改变手动弃牌、比牌、20 轮强制摊牌或结算后 4 秒重置等规则。
 
 ### 4.7 防作弊全量状态脱敏算法 (`getMaskedState`)
 为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 与 [`Room.broadcastState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts)）：
@@ -465,6 +467,8 @@ if (fs.existsSync(config.clientDistPath)) {
 
 * 下注倍率专项测试见 `tests/betting.test.ts`：覆盖底注原额扣除、明牌 1 倍与闷牌 0.5 倍跟注、加注后的跟注、全押基准折算、比牌费用、余额与流水一致性，以及扣款失败时保留原单注基准。
 * 前端金额回归测试见 `tests/frontend-betting.test.ts`：覆盖模拟对局扣款、动作事件金额、比牌弹窗费用、按钮余额门槛与高额下注特效判定。
+* 思考时间测试见 [turn-timer.test.ts](../server/tests/turn-timer.test.ts)：模拟等待 24 小时，验证无限制房间不自动弃牌、开局及轮换没有截止时间、下一局保留设置，且限时超时弃牌与结算重置仍正常执行。
+* [frontend-betting.test.ts](../server/tests/frontend-betting.test.ts) 同时验证大厅创建设置进入模拟控制器并跨开局／操作保持，以及牌桌“无限制”显示。
 
 ### 8.3 RESTful API 完整鉴权与账本单测 (`tests/api.test.ts`)
 * **12 项测试**：
@@ -478,6 +482,8 @@ if (fs.existsSync(config.clientDistPath)) {
 `tests/dealing.test.ts` 覆盖五个分支、2～8 人唯一牌、精确保底、全部冤家组合、座位随机、双端裁判一致和真实模拟；`tests/dealing-room.test.ts` 覆盖下一局生效、脱敏、扣款回滚与循环平分流水。
 
 `tests/dealing-socket.test.ts` 自动创建临时本机服务，以两个独立鉴权客户端完成准备、私发保底牌、比牌和派奖广播。`tests/api.test.ts` 增加配置权限、持久化、错误配置拒绝及模拟草稿隔离验证。测试使用独立内存数据库，不写入既有玩家数据。
+
+[dealing-socket.test.ts](../server/tests/dealing-socket.test.ts) 还验证真实 `room:create` 收到 `turnSeconds: 0` 后，创建、开局、下注轮换和断线重连下发的房间状态均保持 `turnSeconds: 0`、`turnDeadline: null`。
 
 原 `tests/socket_e2e.ts` 仍是需要外部服务和指定账号的手动联调脚本；自动测试使用新脚本，不依赖该账号或固定端口。
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { CompareResultEvent, GameOverEvent, RoomState, UserProfile } from '../types/game';
-import { MockGameController, MOCK_ME } from './mock/mockGameService';
+import { MockGameController, MOCK_ME, MockRoomOptions } from './mock/mockGameService';
 import { sound } from '../audio/SoundManager';
 import { getChipStackCount } from '../components/table/FlyingChipStack';
 
@@ -60,6 +60,7 @@ interface GameStore {
 
   // 动作分发
   toggleMute: () => void;
+  createMockRoom: (options: MockRoomOptions) => string;
   setMockSeatCount: (count: number) => void;
   dealCards: () => void;
   lookCards: () => void;
@@ -155,6 +156,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       const muted = sound.toggleMute();
       set({ isMuted: muted });
     },
+
+    createMockRoom: (options) => controller.createRoom(options),
 
     setMockSeatCount: (count: number) => {
       const { mockController } = get();

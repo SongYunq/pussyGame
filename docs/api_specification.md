@@ -492,9 +492,11 @@ const socket = io("http://localhost:3000", {
 {
   "roomName": "老友聚会局",
   "baseAnte": 10,             // 底注（例如 10 筹码）
-  "turnSeconds": 20           // 房主自定义思考倒计时（秒），如 15/20/30/60
+  "turnSeconds": 20           // 每轮思考时间（秒）：15/20/30/60；0 表示无限制；省略时默认 20
 }
 ```
+* **思考时间契约**：`turnSeconds = 0` 明确表示无限制，服务端必须保留该值，不得回退为默认值或下限。非零值继续按 10～60 秒截取；未提供时默认 20 秒。
+* **无限制房间**：开局及每次轮换后，`room:state.turnSeconds` 为 `0`、`turnDeadline` 为 `null`；不注册回合超时任务，不因等待时间或断线自动弃牌。手动下注、弃牌、比牌及 20 轮上限仍按现有规则执行。
 * **服务端响应回调**：`{ code: 200, roomId: "8888" }`，同时该客户端自动加入该房间，并触发全量 `room:state` 广播。
 
 #### 2. 加入房间
@@ -525,11 +527,11 @@ const socket = io("http://localhost:3000", {
   "deckKind": "standard", // 本局牌库类型，贯穿比牌与结算
   "roomName": "老友聚会局",
   "baseAnte": 10,
-  "turnSeconds": 20,
+  "turnSeconds": 20,      // 0 表示思考时间无限制
   "gameStatus": "playing", // "waiting" (等待开局) | "playing" (游戏中) | "settling" (结算中)
   "currentRound": 3,      // 当前对局进行到第几轮 (上限 20 轮)
   "currentTurnPlayerId": 1, // 当前该谁操作
-  "turnDeadline": 1799889920000, // 倒计时截止时间戳 (前端做本地进度条与倒数)
+  "turnDeadline": 1799889920000, // 倒计时截止时间戳；无限制或无进行中回合时为 null
   "currentBet": 20,       // 当前明牌单注基准（明牌下注 20，闷牌下注 10；开局底注另按 baseAnte 扣除）
   "totalPot": 380,        // 桌面中央奖池总筹码
   "dealerSeatIndex": 0,   // 庄家座位索引
@@ -772,7 +774,7 @@ export interface RoomState {
   roomName: string;
   deckKind: 'standard' | 'short';
   baseAnte: number;
-  turnSeconds: number;
+  turnSeconds: number; // 0 表示无限制，默认 20；非零为 10～60 秒
   gameStatus: 'waiting' | 'playing' | 'settling';
   currentRound: number;
   currentTurnPlayerId: number | null;

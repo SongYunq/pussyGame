@@ -2,8 +2,10 @@ import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockGameController, MOCK_ME } from '../../client/src/store/mock/mockGameService';
 import { useGameStore } from '../../client/src/store/useGameStore';
+import * as gameStoreModule from '../../client/src/store/useGameStore';
 import { ActionPanel } from '../../client/src/components/table/ActionPanel';
 import { SettlementModal } from '../../client/src/components/animations/SettlementModal';
+import { TableView } from '../../client/src/views/TableView';
 
 vi.mock('../../client/src/audio/SoundManager', () => ({
   sound: {
@@ -62,6 +64,48 @@ function startMock() {
   controller.startDeal();
   return { controller, onBet };
 }
+
+describe('Frontend room thinking time', () => {
+  it.each([0, 15, 20, 30, 60])('keeps the selected %i-second setting through creation and play', (seconds) => {
+    useGameStore.getState().setMockSeatCount(3);
+    const roomId = useGameStore.getState().createMockRoom({ roomName: '朋友私局', baseAnte: 20, turnSeconds: seconds });
+    useGameStore.getState().dealCards();
+    useGameStore.getState().lookCards();
+    useGameStore.getState().bet('call', 20);
+    const controller = useGameStore.getState().mockController!;
+    controller.bet(2, 'call', 20);
+    controller.bet(3, 'call', 20);
+
+    const state = useGameStore.getState().roomState;
+    expect(state.roomId).toBe(roomId);
+    expect(state.roomName).toBe('朋友私局');
+    expect(state.baseAnte).toBe(20);
+    expect(state.turnSeconds).toBe(seconds);
+    expect(state.turnDeadline).toBe(seconds === 0 ? null : Date.now() + seconds * 1000);
+    expect(controller.getState()).toBe(state);
+    expect(state.currentTurnPlayerId).toBe(MOCK_ME.id);
+    if (seconds === 0) {
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+      expect(useGameStore.getState().roomState.currentTurnPlayerId).toBe(MOCK_ME.id);
+      expect(useGameStore.getState().roomState.turnDeadline).toBeNull();
+    }
+  });
+
+  it.each([{ seconds: 0, label: '无限制' }, { seconds: 20, label: '20s' }])('shows $label as the room thinking time', ({ seconds, label }) => {
+    useGameStore.getState().createMockRoom({ roomName: '显示测试', baseAnte: 10, turnSeconds: seconds });
+    useGameStore.setState({ activePKClash: null, isGoldStreamTriggered: false, isAllInTriggered: false });
+    // 服务端静态渲染默认读取 Zustand 初始快照，界面断言显式传入当前房间状态。
+    const currentState = useGameStore.getState();
+    const hook = vi.spyOn(gameStoreModule, 'useGameStore').mockReturnValue(currentState);
+    try {
+      const markup = renderToStaticMarkup(createElement(TableView));
+      expect(markup).toContain(`思考: ${label}`);
+      expect(markup).not.toContain('思考: 0s');
+    } finally {
+      hook.mockRestore();
+    }
+  });
+});
 
 describe('Frontend betting amounts', () => {
   it.each([

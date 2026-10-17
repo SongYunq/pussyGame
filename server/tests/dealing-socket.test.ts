@@ -16,6 +16,7 @@ let sockets: Server;
 const clients: Socket[] = [];
 let url: string;
 let roomId = '';
+const roomIds = new Set<string>();
 beforeAll(async () => {
   server = createServer(createApp());
   sockets = new Server(server);
@@ -24,7 +25,7 @@ beforeAll(async () => {
   url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 afterAll(async () => {
-  if (roomId) { RoomManager.getRoom(roomId)?.resetToWaiting(); RoomManager.deleteRoom(roomId); }
+  for (const id of roomIds) { RoomManager.getRoom(id)?.resetToWaiting(); RoomManager.deleteRoom(id); }
   clients.forEach(client => client.disconnect());
   if (sockets) await new Promise<void>(resolve => sockets.close(() => resolve()));
 });
@@ -36,10 +37,16 @@ function ack(client: Socket, event: string, data?: unknown): Promise<any> {
     else client.timeout(3000).emit(event, data, callback);
   });
 }
-function nextEvent(client: Socket, event: string): Promise<any> {
+function nextEvent(client: Socket, event: string, matches: (data: any) => boolean = () => true): Promise<any> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`${event} 超时`)), 3000);
-    client.once(event, data => { clearTimeout(timeout); resolve(data); });
+    const timeout = setTimeout(() => { client.off(event, listener); reject(new Error(`${event} 超时`)); }, 3000);
+    const listener = (data: any) => {
+      if (!matches(data)) return;
+      clearTimeout(timeout);
+      client.off(event, listener);
+      resolve(data);
+    };
+    client.on(event, listener);
   });
 }
 
@@ -55,6 +62,7 @@ it('deals server-configured guarantees to two authenticated clients and broadcas
   }
   const created = await ack(clients[0], 'room:create', { roomName: '联机发牌测试', baseAnte: 10, turnSeconds: 60 });
   roomId = created.roomId;
+  roomIds.add(roomId);
   await ack(clients[1], 'room:join', { roomId });
   await ack(clients[0], 'room:sit', { seatIndex: 0 }); await ack(clients[1], 'room:sit', { seatIndex: 1 });
   const starts = clients.map(client => nextEvent(client, 'game:start'));
@@ -72,4 +80,50 @@ it('deals server-configured guarantees to two authenticated clients and broadcas
   expect(settled.winnerIds).toEqual([settled.winnerId]);
   expect(settled.payouts).toEqual([{ playerId: settled.winnerId, amount: 30 }]);
   expect(settled.splitPot).toBe(false);
+}, 10000);
+
+it('preserves unlimited thinking time through real room creation, turns and reconnection', async () => {
+  const players: Array<{ client: Socket; token: string; id: number }> = [];
+  for (let i = 0; i < 2; i++) {
+    const user = UserModel.createUser(`socket_unlimited_${i}`, 'pass', `不限时玩家${i}`, 'avatar', 1000);
+    const token = signToken({ userId: user.id, username: user.username, role: 'player' });
+    const client = io(url, { auth: { token }, transports: ['websocket'], autoConnect: false });
+    clients.push(client);
+    players.push({ client, token, id: user.id });
+    const connected = nextEvent(client, 'connect');
+    client.connect();
+    await connected;
+  }
+
+  const createdState = nextEvent(players[0].client, 'room:state');
+  const created = await ack(players[0].client, 'room:create', { roomName: '朋友不限时', baseAnte: 10, turnSeconds: 0 });
+  expect(created.code).toBe(200);
+  roomIds.add(created.roomId);
+  expect(await createdState).toMatchObject({ roomId: created.roomId, turnSeconds: 0, turnDeadline: null });
+  await ack(players[1].client, 'room:join', { roomId: created.roomId });
+  await ack(players[0].client, 'room:sit', { seatIndex: 0 });
+  await ack(players[1].client, 'room:sit', { seatIndex: 1 });
+  const started = nextEvent(players[0].client, 'room:state', state => state.gameStatus === 'playing');
+  await ack(players[0].client, 'room:ready', { isReady: true });
+  await ack(players[1].client, 'room:ready', { isReady: true });
+  expect(await started).toMatchObject({ turnSeconds: 0, turnDeadline: null });
+
+  const room = RoomManager.getRoom(created.roomId)!;
+  const actor = players.find(player => player.id === room.currentTurnPlayerId)!;
+  const nextActor = players.find(player => player.id !== actor.id)!;
+  const nextTurn = nextEvent(nextActor.client, 'room:state', state => state.currentTurnPlayerId === nextActor.id);
+  expect((await ack(actor.client, 'game:bet', { actionType: 'call', chipOption: 10 })).code).toBe(200);
+  expect(await nextTurn).toMatchObject({ turnSeconds: 0, turnDeadline: null });
+
+  nextActor.client.disconnect();
+  const reconnected = io(url, { auth: { token: nextActor.token }, transports: ['websocket'], autoConnect: false });
+  clients.push(reconnected);
+  const restored = nextEvent(reconnected, 'room:state');
+  reconnected.connect();
+  const state = await restored;
+  expect(state).toMatchObject({ currentTurnPlayerId: nextActor.id, gameStatus: 'playing', turnSeconds: 0, turnDeadline: null });
+  expect(state.seats.filter((seat: any) => seat?.status === 'active')).toHaveLength(2);
+  expect((await ack(reconnected, 'game:bet', { actionType: 'call', chipOption: 10 })).code).toBe(200);
+  expect(room.turnDeadline).toBeNull();
+  expect(room.currentTurnPlayerId).toBe(actor.id);
 }, 10000);

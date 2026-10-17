@@ -65,7 +65,7 @@ export interface RoomState {
   roomName: string;
   deckKind: DeckKind;
   baseAnte: number;
-  turnSeconds: number;
+  turnSeconds: number; // 0 表示思考时间无限制
   gameStatus: 'waiting' | 'playing' | 'settling';
   currentRound: number;
   currentTurnPlayerId: number | null;

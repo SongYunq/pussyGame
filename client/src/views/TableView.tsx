@@ -73,7 +73,7 @@ export const TableView: React.FC<TableViewProps> = ({
               </span>
             </div>
             <span className="text-[10px] text-slate-400">
-              {roomState.deckKind === 'short' ? '28 张短牌' : '52 张标准牌'} · 底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds}s
+              {roomState.deckKind === 'short' ? '28 张短牌' : '52 张标准牌'} · 底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds === 0 ? '无限制' : `${roomState.turnSeconds}s`}
             </span>
           </div>
         </div>

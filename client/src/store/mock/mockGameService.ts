@@ -97,6 +97,8 @@ export interface MockBetNotification {
   isDevTool?: boolean;
 }
 
+export type MockRoomOptions = Pick<RoomState, 'roomName' | 'baseAnte' | 'turnSeconds'>;
+
 /**
  * 纯前端 Mock 游戏控制器
  */
@@ -138,6 +140,24 @@ export class MockGameController {
   }
 
   /**
+   * 创建本地房间，将大厅设置保存在模拟控制器中。
+   */
+  public createRoom(options: MockRoomOptions): string {
+    this.clearBotTimer();
+    this.secretCards.clear();
+    this.lastSettlement = null;
+    this.hasTriggeredGoldInHand = false;
+    this.state = {
+      ...createInitialMockRoom(this.state.seats.filter((seat) => seat?.user).length),
+      ...options,
+      roomId: Math.floor(1000 + Math.random() * 9000).toString(),
+      currentBet: options.baseAnte,
+    };
+    this.onStateChange(this.state);
+    return this.state.roomId;
+  }
+
+  /**
    * 重设在座人数 (2~8 人) 测试自适应桌位排布
    */
   public setSeatCount(count: number) {
@@ -169,7 +189,7 @@ export class MockGameController {
       draft.currentBet = draft.baseAnte;
       draft.totalPot = 0;
       draft.currentTurnPlayerId = MOCK_ME.id;
-      draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
+      draft.turnDeadline = draft.turnSeconds === 0 ? null : Date.now() + draft.turnSeconds * 1000;
 
       draft.seats.forEach((seat) => {
         if (seat && seat.user) {
@@ -431,7 +451,7 @@ export class MockGameController {
     }
 
     draft.currentTurnPlayerId = draft.seats[nextIndex]!.user!.id;
-    draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
+    draft.turnDeadline = draft.turnSeconds === 0 ? null : Date.now() + draft.turnSeconds * 1000;
   }
 
   private scheduleBotTurnIfNeeded(delayMs = 1150) {
