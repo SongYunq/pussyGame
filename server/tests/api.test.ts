@@ -147,3 +147,45 @@ describe('RESTful API & Economic System', () => {
     expect(res.body.code).toBe(403);
   });
 });
+
+describe('Dealing configuration endpoints', () => {
+  it('returns the new defaults to administrators only', async () => {
+    const result = await request(app).get('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`);
+    expect(result.body.data.deckProbabilities).toEqual({ standard: 20, short: 80 });
+    expect(result.body.data.guarantees['8'].pair).toBe(2);
+    expect((await request(app).get('/api/admin/algorithm/config')).status).toBe(401);
+    for (const endpoint of ['/api/admin/algorithm/config', '/api/admin/algorithm/simulate']) {
+      expect((await request(app).post(endpoint).set('Authorization', `Bearer ${playerToken}`).send({})).status).toBe(403);
+    }
+  });
+
+  it('persists a valid configuration and rejects invalid totals or overflowing plans', async () => {
+    const current = await request(app).get('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`);
+    const config = current.body.data;
+    config.deckProbabilities = { standard: 0, short: 100 };
+    const saved = await request(app).post('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`).send(config);
+    expect(saved.status).toBe(200);
+    expect(saved.body.message).toContain('下一局');
+    const loaded = await request(app).get('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`);
+    expect(loaded.body.data).toEqual(config);
+    const invalid = structuredClone(config); invalid.guarantees['2'].straight = 1;
+    expect((await request(app).post('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`).send(invalid)).status).toBe(400);
+    invalid.guarantees['2'].straight = 0; invalid.deckProbabilities.short = 99;
+    expect((await request(app).post('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`).send(invalid)).status).toBe(400);
+    const unchanged = await request(app).get('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`);
+    expect(unchanged.body.data).toEqual(config);
+  });
+
+  it('runs actual preview deals without saving the draft, and bounds the work', async () => {
+    const { defaultAlgorithmConfig } = await import('../src/shared/dealing.js');
+    const config = defaultAlgorithmConfig();
+    config.deckProbabilities = { standard: 100, short: 0 }; config.standardModes = { random: 0, rival: 0, guarantee: 100 };
+    const result = await request(app).post('/api/admin/algorithm/simulate').set('Authorization', `Bearer ${adminToken}`).send({ rounds: 10, playerCount: 3, config });
+    expect(result.status).toBe(200); expect(result.body.data.totalHands).toBe(30);
+    expect(result.body.data.branches.standard_guarantee).toBe(10);
+    expect(result.body.data.stats.pair.count).toBeGreaterThanOrEqual(20);
+    const unchanged = await request(app).get('/api/admin/algorithm/config').set('Authorization', `Bearer ${adminToken}`);
+    expect(unchanged.body.data.deckProbabilities).toEqual({ standard: 0, short: 100 });
+    expect((await request(app).post('/api/admin/algorithm/simulate').set('Authorization', `Bearer ${adminToken}`).send({ rounds: 5001, playerCount: 3, config })).status).toBe(400);
+  });
+});

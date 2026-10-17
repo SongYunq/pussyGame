@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockGameController, MOCK_ME } from '../../client/src/store/mock/mockGameService';
 import { useGameStore } from '../../client/src/store/useGameStore';
 import { ActionPanel } from '../../client/src/components/table/ActionPanel';
+import { SettlementModal } from '../../client/src/components/animations/SettlementModal';
 
 vi.mock('../../client/src/audio/SoundManager', () => ({
   sound: {
@@ -25,6 +26,34 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
+});
+
+describe('Frontend cyclic settlement', () => {
+  it('keeps the mock payout and each displayed winner hand consistent', () => {
+    const { controller } = startMock();
+    const state = controller.getState();
+    state.deckKind = 'standard';
+    state.currentRound = 20;
+    state.currentTurnPlayerId = 3;
+    const hands = [
+      [{ rank: 14, suit: 'spades' }, { rank: 14, suit: 'hearts' }, { rank: 14, suit: 'clubs' }],
+      [{ rank: 2, suit: 'spades' }, { rank: 3, suit: 'clubs' }, { rank: 5, suit: 'hearts' }],
+      [{ rank: 6, suit: 'diamonds' }, { rank: 9, suit: 'diamonds' }, { rank: 13, suit: 'diamonds' }],
+    ] as import('../../client/src/types/game').Card[][];
+    hands.forEach((hand, index) => controller.getSecretHand(index + 1)!.splice(0, 3, ...hand));
+    const before = state.seats.slice(0, 3).map(seat => seat!.user!.balance);
+    controller.bet(3, 'call', 10);
+    const event = controller.getLastSettlement()!;
+    expect(event.winnerId).toBeNull();
+    expect(event.winnerIds).toEqual([1, 2, 3]);
+    expect(event.payouts.reduce((sum, payout) => sum + payout.amount, 0)).toBe(35);
+    controller.getState().seats.slice(0, 3).forEach((seat, index) => expect(seat!.user!.balance).toBeCloseTo(before[index] - (index === 2 ? 5 : 0) + 35 / 3, 8));
+    const markup = renderToStaticMarkup(createElement(SettlementModal, { settlementEvent: event, seats: controller.getState().seats, onClose: vi.fn() }));
+    expect(markup).toContain('平 分 奖 池');
+    expect(markup).toContain('豹子 AAA');
+    expect(markup).toContain('特殊 235');
+    expect(markup).toContain('K最大');
+  });
 });
 
 function startMock() {

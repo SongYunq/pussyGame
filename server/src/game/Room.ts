@@ -1,6 +1,9 @@
 import { Server } from 'socket.io';
 import { Card, RoomState, TableSeat } from '../types/index.js';
-import { Deck } from './Card.js';
+import { DeckKind, splitPot } from '../shared/poker.js';
+import { dealHands } from '../shared/dealing.js';
+import { AlgorithmModel } from '../models/algorithmModel.js';
+import { getDb } from '../db/database.js';
 import { GameReferee } from './GameReferee.js';
 import { UserModel } from '../models/userModel.js';
 
@@ -18,6 +21,7 @@ export class Room {
   public baseAnte: number;
   public turnSeconds: number;
   public gameStatus: 'waiting' | 'playing' | 'settling' = 'waiting';
+  public deckKind: DeckKind = 'standard';
   public currentRound: number = 0;
   public currentTurnPlayerId: number | null = null;
   public turnDeadline: number | null = null;
@@ -165,44 +169,39 @@ export class Room {
     const readySeats = this.seats.filter((s): s is TableSeat => s !== null && s.isReady);
     if (readySeats.length < 2) return;
 
-    // 清除上轮结算定时器
-    if (this.settlingTimer) {
-      clearTimeout(this.settlingTimer);
-      this.settlingTimer = null;
-    }
+    // 发牌前重新确认实际可参与人数，避免扣款失败后出现单人或空局。
+    const activeSeats = readySeats.filter(seat => {
+      const user = UserModel.findById(seat.user!.id);
+      if (!user || user.balance < this.baseAnte) {
+        seat.status = 'sitting';
+        seat.isReady = false;
+        seat.cards = null;
+        if (user) seat.user!.balance = user.balance;
+        return false;
+      }
+      return true;
+    });
+    if (activeSeats.length < 2) { this.broadcastState(); return; }
 
+    // 先生成完整合法手牌；配置或选牌失败时不扣除任何底注。
+    const deal = dealHands(activeSeats.length, AlgorithmModel.getConfig());
+    const payments = getDb().transaction(() => activeSeats.map(seat => UserModel.changeBalance(
+      seat.user!.id, -this.baseAnte, 'ante', `第 ${this.roomId} 房间底注扣除`
+    )))();
+
+    if (this.settlingTimer) { clearTimeout(this.settlingTimer); this.settlingTimer = null; }
     this.gameStatus = 'playing';
     this.currentRound = 1;
     this.currentBet = this.baseAnte;
-    this.totalPot = 0;
-
-    // 1. 原子扣除底注进奖池
-    for (const seat of readySeats) {
-      try {
-        const result = UserModel.changeBalance(
-          seat.user!.id,
-          -this.baseAnte,
-          'ante',
-          `第 ${this.roomId} 房间底注扣除`
-        );
-        seat.user!.balance = result.balance;
-        seat.currentInvested = this.baseAnte;
-        seat.status = 'active';
-        seat.hasLooked = false;
-        this.totalPot += this.baseAnte;
-      } catch (err) {
-        // 筹码扣除失败则踢出座位
-        seat.status = 'sitting';
-        seat.isReady = false;
-      }
-    }
-
-    // 2. 洗牌与发牌
-    const deck = Deck.shuffle(Deck.createDeck());
-    const activeSeats = this.seats.filter((s): s is TableSeat => s !== null && s.status === 'active');
-    for (const seat of activeSeats) {
-      seat.cards = [deck.pop()!, deck.pop()!, deck.pop()!];
-    }
+    this.totalPot = this.baseAnte * activeSeats.length;
+    this.deckKind = deal.deckKind;
+    activeSeats.forEach((seat, index) => {
+      seat.user!.balance = payments[index].balance;
+      seat.currentInvested = this.baseAnte;
+      seat.status = 'active';
+      seat.hasLooked = false;
+      seat.cards = deal.hands[index].cards;
+    });
 
     // 3. 确定首轮出牌人（庄家顺时针下一位）
     const activeIndices = activeSeats.map((s) => s.seatIndex);
@@ -229,6 +228,7 @@ export class Room {
             baseAnte: this.baseAnte,
             totalPot: this.totalPot,
             handCards: seat.cards,
+            deckKind: this.deckKind,
           });
         }
       }
@@ -421,7 +421,7 @@ export class Room {
     this.totalPot += cost;
 
     // 裁判引擎判定胜负
-    const result = GameReferee.compareHands(initSeat.cards!, targetSeat.cards!, 'A');
+    const result = GameReferee.compareHands(initSeat.cards!, targetSeat.cards!, 'A', this.deckKind);
     const winnerId = result === 1 ? initiatorId : targetPlayerId;
     const loserId = result === 1 ? targetPlayerId : initiatorId;
 
@@ -499,30 +499,30 @@ export class Room {
       seatIndex: s.seatIndex,
     }));
 
-    const result = GameReferee.showdownMultiple(showdownData);
-    this.settleGameOver(result.winnerId, 'max_round_showdown');
+    const result = GameReferee.showdownMultiple(showdownData, this.deckKind);
+    this.settleGameOver(result.winnerIds, 'max_round_showdown');
   }
 
   /**
    * 结算终局，派发总底池
    */
-  private settleGameOver(winnerId: number, reason: 'last_survivor' | 'max_round_showdown'): void {
+  private settleGameOver(winners: number | number[], reason: 'last_survivor' | 'max_round_showdown'): void {
+    const winnerIds = Array.isArray(winners) ? winners : [winners];
+    const winnerId = winnerIds.length === 1 ? winnerIds[0] : null;
+    const winAmount = this.totalPot;
+    const payouts = splitPot(winAmount, winnerIds);
+    const balances = getDb().transaction(() => payouts.map(payout => UserModel.changeBalance(
+      payout.playerId, payout.amount, 'game_win',
+      `第 ${this.roomId} 房间炸金花${winnerIds.length > 1 ? '循环克制平分奖池' : '独揽奖池'}`
+    )))();
+    payouts.forEach((payout, index) => {
+      const seat = this.seats.find(s => s?.user?.id === payout.playerId);
+      if (seat?.user) seat.user.balance = balances[index].balance;
+    });
+    const winnerSeat = winnerId === null ? undefined : this.seats.find(s => s?.user?.id === winnerId);
     this.clearTurnTimer();
     this.gameStatus = 'settling';
-
-    // 获胜者入账总奖池
-    const winAmount = this.totalPot;
-    const res = UserModel.changeBalance(
-      winnerId,
-      winAmount,
-      'game_win',
-      `第 ${this.roomId} 房间炸金花独揽奖池`
-    );
-
-    const winnerSeat = this.seats.find((s) => s?.user?.id === winnerId);
-    if (winnerSeat && winnerSeat.user) {
-      winnerSeat.user.balance = res.balance;
-    }
+    this.currentTurnPlayerId = null;
 
     // 构建亮牌列表
     const revealedCards: Array<{
@@ -535,7 +535,7 @@ export class Room {
     if (reason === 'max_round_showdown') {
       // 20 轮开牌公开所有存活玩家手牌
       for (const s of this.getActiveSeats()) {
-        const evalRes = GameReferee.evaluateHand(s.cards!);
+        const evalRes = GameReferee.evaluateHand(s.cards!, this.deckKind);
         revealedCards.push({
           playerId: s.user!.id,
           cards: s.cards!,
@@ -546,9 +546,9 @@ export class Room {
     } else {
       // 独存赢家亮牌
       if (winnerSeat && winnerSeat.cards) {
-        const evalRes = GameReferee.evaluateHand(winnerSeat.cards);
+        const evalRes = GameReferee.evaluateHand(winnerSeat.cards, this.deckKind);
         revealedCards.push({
-          playerId: winnerId,
+          playerId: winnerSeat.user!.id,
           cards: winnerSeat.cards,
           handType: evalRes.type,
           handTypeName: evalRes.typeName,
@@ -559,6 +559,9 @@ export class Room {
     if (this.io) {
       this.io.to(`room:${this.roomId}`).emit('game:over', {
         winnerId,
+        winnerIds,
+        payouts,
+        splitPot: winnerIds.length > 1,
         winAmount,
         reason,
         revealedCards,
@@ -581,6 +584,8 @@ export class Room {
    * 重置房间回到准备等待阶段
    */
   public resetToWaiting(): void {
+    this.clearTurnTimer();
+    if (this.settlingTimer) { clearTimeout(this.settlingTimer); this.settlingTimer = null; }
     this.gameStatus = 'waiting';
     this.currentRound = 0;
     this.currentTurnPlayerId = null;
@@ -664,6 +669,7 @@ export class Room {
     return {
       roomId: this.roomId,
       roomName: this.roomName,
+      deckKind: this.deckKind,
       baseAnte: this.baseAnte,
       turnSeconds: this.turnSeconds,
       gameStatus: this.gameStatus,

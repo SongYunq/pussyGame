@@ -122,6 +122,7 @@ export const PokerTable: React.FC<PokerTableProps> = ({
 
             return (
               <TableSeat
+                deckKind={roomState.deckKind}
                 key={item.seatIndex}
                 seat={item.seat}
                 isMe={item.isMe}

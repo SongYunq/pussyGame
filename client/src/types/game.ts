@@ -1,3 +1,4 @@
+import type { DeckKind } from '../../../server/src/shared/poker';
 // 卡牌花色定义 (黑桃, 红桃, 梅花, 方块)
 export type CardSuit = 'spades' | 'hearts' | 'clubs' | 'diamonds';
 
@@ -9,12 +10,12 @@ export interface Card {
 
 // 牌型等级定义
 export type HandRankType =
-  | 'special_235'      // 特殊 235 (不同花色 235 遇豹子逆袭)
+  | 'special_235'      // 特殊 235 (花色不全相同 235 遇豹子逆袭)
   | 'high_card'        // 单张 (散牌)
   | 'pair'             // 对子
   | 'straight'         // 顺子
-  | 'flush'            // 金花 (同花)
-  | 'straight_flush'   // 同花顺 (顺金)
+  | 'flush'            // 金花
+  | 'straight_flush'   // 顺金
   | 'leopard';         // 豹子 (三张相同)
 
 export interface HandEvaluation {
@@ -62,6 +63,7 @@ export interface TableSeat {
 export interface RoomState {
   roomId: string;
   roomName: string;
+  deckKind: DeckKind;
   baseAnte: number;
   turnSeconds: number;
   gameStatus: 'waiting' | 'playing' | 'settling';
@@ -105,7 +107,10 @@ export interface RevealedHand {
 
 // 终局结算事件广播数据
 export interface GameOverEvent {
-  winnerId: number;
+  winnerId: number | null;
+  winnerIds: number[];
+  payouts: Array<{ playerId: number; amount: number }>;
+  splitPot: boolean;
   winAmount: number;
   reason: 'last_survivor' | 'max_round_showdown';
   revealedCards: RevealedHand[];

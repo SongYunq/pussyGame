@@ -11,6 +11,7 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { AuthController } from './controllers/authController.js';
 import { UserController } from './controllers/userController.js';
 import { AdminController } from './controllers/adminController.js';
+import { AlgorithmController } from './controllers/algorithmController.js';
 import { setupSocketHandler } from './socket/socketHandler.js';
 
 export function createApp() {
@@ -38,6 +39,9 @@ export function createApp() {
   apiRouter.post('/admin/users/:id/chips', authenticateHttp, requireAdmin, AdminController.modifyChips);
   apiRouter.post('/admin/users/:id/reset-password', authenticateHttp, requireAdmin, AdminController.resetPassword);
   apiRouter.get('/admin/audit-logs', authenticateHttp, requireAdmin, AdminController.getAuditLogs);
+  apiRouter.get('/admin/algorithm/config', authenticateHttp, requireAdmin, AlgorithmController.getConfig);
+  apiRouter.post('/admin/algorithm/config', authenticateHttp, requireAdmin, AlgorithmController.saveConfig);
+  apiRouter.post('/admin/algorithm/simulate', authenticateHttp, requireAdmin, AlgorithmController.simulate);
 
   app.use('/api', apiRouter);
 

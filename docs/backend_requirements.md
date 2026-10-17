@@ -9,7 +9,7 @@
 ## 目录
 1. [系统整体架构与工程定位](#一-系统整体架构与工程定位)
 2. [数据库设计与原子账本系统 (SQLite + WAL)](#二-数据库设计与原子账本系统-sqlite--wal)
-3. [核心裁判引擎与卡牌算法规范 (GameReferee & Card)](#三-核心裁判引擎与卡牌算法规范-gamereferee--card)
+3. [核心裁判与发牌算法](#三-核心裁判与发牌算法)
 4. [纯内存房间状态机设计 (Room & RoomManager)](#四-纯内存房间状态机设计-room--roommanager)
 5. [WebSocket (Socket.io) 实时网关规范](#五-websocket-socketio-实时网关规范)
 6. [RESTful HTTP API 与管理后台中枢](#六-restful-http-api-与管理后台中枢)
@@ -160,7 +160,7 @@ CREATE INDEX IF NOT EXISTS idx_ledgers_created_at ON ledgers(created_at);
 ```
 
 ### 2.3 原子事务控制与防刷原则 (`UserModel.changeBalance`)
-在对局中，玩家的扣底注、下注、比牌消耗以及最终赢牌入账，全部封装在 SQLite 原子事务中（参考 [`UserModel.changeBalance`](file:///Users/prina/Downloads/pussyGame/server/src/models/userModel.ts#L103-L140)）：
+在对局中，玩家的扣底注、下注、比牌消耗以及最终赢牌入账，全部封装在 SQLite 原子事务中（参考 [`UserModel.changeBalance`](file:///Users/prina/Downloads/pussyGame/server/src/models/userModel.ts)）：
 ```typescript
 static changeBalance(
   userId: number,
@@ -195,59 +195,44 @@ static changeBalance(
 * **并发安全保证**：`better-sqlite3` 是同步执行的驱动库，配合 WAL 模式与 `db.transaction()`，天然形成互斥锁屏障，杜绝任何异步并发引发的重复下注或负余额问题。
 
 ### 2.4 默认管理员与开局控币机制
-在 [`server/src/db/database.ts`](file:///Users/prina/Downloads/pussyGame/server/src/db/database.ts#L69-L93) 中，服务启动若检测到系统中无管理员，会自动插入默认管理员（账号 `admin`，初始密码 `admin123`，初始资金 `1,000,000` 筹码），并记录系统第一笔充值账本流水。后续由管理员在后台为朋友发号并分发初始筹码。
+在 [`server/src/db/database.ts`](file:///Users/prina/Downloads/pussyGame/server/src/db/database.ts) 中，服务启动若检测到系统中无管理员，会自动插入默认管理员（账号 `admin`，初始密码 `admin123`，初始资金 `1,000,000` 筹码），并记录系统第一笔充值账本流水。后续由管理员在后台为朋友发号并分发初始筹码。
 
 ---
 
-## 三、 核心裁判引擎与卡牌算法规范 (GameReferee & Card)
+### 2.5 发牌配置表 (`game_settings`)
 
-裁判模块完全独立于网络与房间逻辑，封装在 [`server/src/game/Card.ts`](file:///Users/prina/Downloads/pussyGame/server/src/game/Card.ts) 与 [`server/src/game/GameReferee.ts`](file:///Users/prina/Downloads/pussyGame/server/src/game/GameReferee.ts) 中。
+使用 `key TEXT PRIMARY KEY`、`value TEXT NOT NULL`、`updated_at DATETIME` 保存全局发牌配置，条目名为 `dealing_config_v1`。默认配置在条目不存在时提供；每次保存完整校验后使用原子更新。本局开局读取配置，后续保存只影响下一局。
 
-### 3.1 扑克牌定义与 Fisher-Yates 洗牌
-* **卡牌规格**：标准扑克去除大小王，共 52 张；
-  - 4 种花色：黑桃 (`spades`)、红桃 (`hearts`)、梅花 (`clubs`)、方块 (`diamonds`)；
-  - 13 种点数：2, 3, 4, 5, 6, 7, 8, 9, 10, 11 (J), 12 (Q), 13 (K), 14 (A)；
-* **洗牌算法**：开局调用 `Deck.shuffle(Deck.createDeck())`，使用 Fisher-Yates 算法，时间复杂度 $O(N)$；在各次随机选择均匀且独立的假设下，每个牌序置换等概率。当前随机来源为 `Math.random()`。
-* **调控接入状态**：当前服务端发牌未读取管理端模式或权重，也未实现算法配置与仿真路由。具体构建规则与待实现范围见 [发牌算法需求文档](dealing_algorithm_requirements.md)。
+## 三、 核心裁判与发牌算法
 
-### 3.2 牌型判定与权重层级体系
-输入任意 3 张扑克牌，经过点数降序排序后，按以下优先级精准判定牌型（权重从小到大）：
+### 3.1 共用规则与双牌库
 
-| 牌型层级 | 类型枚举 (`type`) | 权重 (`weight`) | 判定逻辑与说明 | 点数比对序列 (`ranks`) |
-| :--- | :--- | :---: | :--- | :--- |
-| **1. 豹子** | `leopard` | **6** | 三张牌点数完全一致 (如 AAA, 888) | `[r1, r2, r3]` |
-| **2. 同花顺** | `straight_flush` | **5** | 三张牌花色相同且点数连续 (如 黑桃 Q-K-A, 红桃 A-2-3) | 正常为 `[r1, r2, r3]`；若为 A-2-3 则映射为 `[3, 2, 1]` |
-| **3. 金花** | `flush` | **4** | 三张牌同花色，但点数不连续 (如 方块 A-10-4) | `[r1, r2, r3]` 从大到小 |
-| **4. 顺子** | `straight` | **3** | 三张牌花色不同，但点数连续 (如 8-9-10, A-2-3) | 正常为 `[r1, r2, r3]`；若为 A-2-3 则映射为 `[3, 2, 1]` |
-| **5. 对子** | `pair` | **2** | 恰好两张牌点数相同 + 一张散牌 (如 9-9-K) | `[对子点数, 对子点数, 单牌点数]` |
-| **6. 单张 (散牌)**| `high_card` | **1** | 三张牌不同花色、不连号、无对子 | `[r1, r2, r3]` 从大到小 |
-| **7. 特殊 235**| `special_235` | **1** (遇豹子为 **7**) | **不同花色的 2-3-5**。无豹子时作为常规最小单张；当且仅当对局中有豹子时逆袭压制所有豹子 | `[5, 3, 2]` |
+联机服务端与本地演示均使用 [shared/poker.ts](../server/src/shared/poker.ts) 和 [shared/dealing.ts](../server/src/shared/dealing.ts)。`GameReferee`、`Deck` 保留适配入口。
 
-### 3.3 A-2-3 最小顺子特殊比点算法
-在经典炸金花规则中，A-2-3 是合法顺子，但属于所有顺子中**最小的顺子**（小于 2-3-4）。
-* 裁判引擎识别到 `r1 === 14 && r2 === 3 && r3 === 2` 时，判定为顺子；
-* 权重比对序列被特殊映射为 `ranks: [3, 2, 1]`，因此在与 2-3-4 的序列 `[4, 3, 2]` 逐位比对时，4 > 3，确保 2-3-4 正确胜出 A-2-3。
+- 标准牌 52 张，点数 2～A；短牌 28 张，仅 8～A。无大小王，每人三张，全桌无重复。
+- 标准牌／短牌默认比例 20／80；标准牌随机／冤家／保底为 30／40／30，短牌随机／冤家为 70／30。
+- 先生成完整合法手牌，再在外层数据库事务中扣除全部底注，任一失败则全部回滚；有效人数不足两人不扣款、不开始。
+- 冤家及精确牌型保底先占牌，随机手牌从余牌产生，再随机排列全部手牌组。具体规则见根目录 [dealing_rules.md](../dealing_rules.md)。
 
-### 3.4 特殊 235 逆袭豹子算法
-在 [`GameReferee.compareHands`](file:///Users/prina/Downloads/pussyGame/server/src/game/GameReferee.ts#L135-L172) 中：
-```typescript
-if (evalA.type === 'special_235' && evalB.type === 'leopard') {
-  return 1; // 235 逆袭反杀豹子！A 胜
-}
-if (evalA.type === 'leopard' && evalB.type === 'special_235') {
-  return -1; // 235 逆袭反杀豹子！B 胜
-}
-```
-* 当没有豹子对战时，`special_235` 保持 `weight: 1`，按普通单张 5 最大处理（甚至会被普通的 2-3-6 散牌击败）。
+### 3.2 牌型与花色比较
 
-### 3.5 双人比牌与“主动发起方判负”平局规则
-当两位玩家牌型等级权重完全一致，且 3 个比对点数序列完全相等（例如两副散牌点数均为 A-K-J，或者在炸金花不比花色的经典规则下点数完全相同）：
-* **裁判原则**：**主动发起比牌者判负**（保护被挑战的防守方，符合大众经典防进攻白嫖规则）。
+等级为豹子 6、顺金 5、金花 4、顺子 3、对子 2、散牌 1；标准牌特殊 235 平时为散牌，仅与豹子直接比较时逆袭。
 
-### 3.6 20 轮满轮全员终局裁决 (`showdownMultiple`)
-对局达到 20 轮上限时，触发强制开牌。存活玩家全部亮牌，通过多方两两循环擂台 PK 算法决出唯一的最终胜者：
-* 擂台初始擂主为 `players[0]`，后续存活者依次作为挑战者发起对比；
-* 若挑战者击败当前擂主，则挑战者升任新擂主，直至全员比完，返回绝对优胜者与牌型。
+标准牌 A-2-3 映射 `[3, 2, 1]`，短牌 A-8-9 映射 `[9, 8, 7]`；Q-K-A 最大。房间的 `deckKind` 贯穿开局、比牌、强制摊牌及亮牌标签。
+
+同点数时关键牌花色按黑桃 > 红桃 > 梅花 > 方块比较。对子取对子两张的最大花色；顺子取有效最高点数，低 A 顺子分别取 3、9；其他牌型取最大点数牌的最大花色。完全无法区分才由主动比牌者判负。
+
+### 3.3 循环克制与派奖
+
+强制摊牌同时存在豹子、特殊 235 和其他牌型时，全部仍存活玩家平分底池；仅有豹子和 235 时正常比较，不平分。
+
+`splitPot` 生成各人份额，最后一份接收浮点尾差，保持总额一致。所有 `game_win` 余额与流水更新位于同一外层事务中；全部成功后才更新内存和广播。单人获胜更新庄家，平分保持原庄家。
+
+### 3.4 配置与真实模拟
+
+管理员接口由 `AlgorithmController`、`AlgorithmModel` 提供。旧的倍率及个人幸运配置已被版本 1 的双牌库、模式比例、冤家组合比例和按人数保底方案取代。
+
+`simulateDeals` 使用正式发牌函数实际采样，支持 1～5,000 局及 2～8 人，每 25 局让出执行时间；预览配置不入库。完整字段、约束、选牌上限及公平边界见 [发牌算法规范](dealing_algorithm_requirements.md)。
 
 ---
 
@@ -262,7 +247,7 @@ if (evalA.type === 'leopard' && evalB.type === 'special_235') {
 │    - 玩家加入观战 / 选座入座 (seats[0..7])             │
 │    - 满足条件: 在座人数 ≥ 2 且全部勾选 isReady: true   │
 └──────────────────────────┬─────────────────────────────┘
-                           │ 扣除底注、洗牌、私发手牌
+                           │ 生成合法手牌、原子扣注、私发
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │ 2. 牌局对决阶段 (gameStatus: 'playing')                │
@@ -334,7 +319,7 @@ export type PlayerTableStatus =
 * 若玩家中途刷新或重连连入，倒计时不重置，客户端无缝恢复剩余倒计时。
 
 ### 4.7 防作弊全量状态脱敏算法 (`getMaskedState`)
-为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts#L652-L679) 与 [`Room.broadcastState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts#L684-L699)）：
+为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 与 [`Room.broadcastState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts)）：
 ```typescript
 public getMaskedState(forUserId?: number): RoomState {
   const maskedSeats = this.seats.map((seat) => {
@@ -359,7 +344,7 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 
 ### 5.1 握手鉴权与房间恢复
 * **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](file:///Users/prina/Downloads/pussyGame/server/src/utils/jwt.ts) 解析出 `userId`、`username`、`role` 并绑定至 Socket 实例，验签失败直接拒绝握手；
-* **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](file:///Users/prina/Downloads/pussyGame/server/src/socket/socketHandler.ts#L34-L40) 检索其历史所在的房间：
+* **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](file:///Users/prina/Downloads/pussyGame/server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
   2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
 
@@ -404,11 +389,14 @@ RESTful 接口遵循统一规范包裹对象：`{ code, message, data }`。完�
     ├── GET  /users                 # 检索全量用户 (附加实时在线与所在房间号)
     ├── POST /users/:id/chips       # 手动为用户充值或扣减筹码 (原子入账流水)
     ├── POST /users/:id/reset-password # 强制重置指定用户密码
-    └── GET  /audit-logs            # 分页拉取全服全局筹码审计流水
+    ├── GET  /audit-logs            # 分页拉取全服全局筹码审计流水
+    ├── GET  /algorithm/config      # 读取新发牌配置
+    ├── POST /algorithm/config      # 校验并保存，下一局生效
+    └── POST /algorithm/simulate    # 使用草稿执行真实发牌模拟
 ```
 
 ### 6.2 实时在线与所在房间追踪实现
-在 [`AdminController.listUsers`](file:///Users/prina/Downloads/pussyGame/server/src/controllers/adminController.ts#L52-L82) 中，服务端将 SQLite 用户列表与 [`RoomManager.getUserOnlineStatus(userId)`](file:///Users/prina/Downloads/pussyGame/server/src/game/RoomManager.ts#L65-L72) 实时结合，动态透传：
+在 [`AdminController.listUsers`](file:///Users/prina/Downloads/pussyGame/server/src/controllers/adminController.ts) 中，服务端将 SQLite 用户列表与 [`RoomManager.getUserOnlineStatus(userId)`](file:///Users/prina/Downloads/pussyGame/server/src/game/RoomManager.ts) 实时结合，动态透传：
 * `isOnline`: 当前玩家是否有活跃的 WebSocket 连接；
 * `currentRoomId`: 当前玩家正在哪一个房间中对局或观战。管理员在后台对全服动态一目了然。
 
@@ -459,11 +447,11 @@ if (fs.existsSync(config.clientDistPath)) {
 
 ### 8.1 裁判引擎全覆盖单测 (`tests/referee.test.ts`)
 * **15/15 项全部通过**：
-  1. 豹子、同花顺、金花、顺子、对子、散牌判定；
+  1. 豹子、顺金、金花、顺子、对子、散牌判定；
   2. A-2-3 最小顺子判定与比点逻辑；
   3. 特殊 235 逆袭豹子；
   4. 无豹子时 235 作为普通单张；
-  5. 同牌型点数完全相等时主动方判负；
+  5. 同点数先比关键牌花色，仍相同时主动方判负；
   6. 20 轮满轮多人擂台裁决。
 
 ### 8.2 房间状态机流转单测 (`tests/room.test.ts`)
@@ -479,14 +467,19 @@ if (fs.existsSync(config.clientDistPath)) {
 * 前端金额回归测试见 `tests/frontend-betting.test.ts`：覆盖模拟对局扣款、动作事件金额、比牌弹窗费用、按钮余额门槛与高额下注特效判定。
 
 ### 8.3 RESTful API 完整鉴权与账本单测 (`tests/api.test.ts`)
-* **9/9 项全部通过**：
+* **12 项测试**：
   1. 登录成功获取 Token 与错误拦截；
   2. 凭证受保护接口与管理员鉴权拦截；
   3. 管理员发号、改密、充扣筹码与原子流水记录；
   4. 用户个人资料更新与个人账本分页拉取。
 
-### 8.4 WebSocket 端到端双客户端联调模拟 (`tests/socket_e2e.ts`)
-真实拉起 HTTP 与 Socket.io 服务，两个独立的 WebSocket 客户端完成：连接、鉴权、入座、就绪、发牌、看牌、比牌淘汰及终局奖池全流程联调。
+### 8.4 新发牌测试与联机验证
+
+`tests/dealing.test.ts` 覆盖五个分支、2～8 人唯一牌、精确保底、全部冤家组合、座位随机、双端裁判一致和真实模拟；`tests/dealing-room.test.ts` 覆盖下一局生效、脱敏、扣款回滚与循环平分流水。
+
+`tests/dealing-socket.test.ts` 自动创建临时本机服务，以两个独立鉴权客户端完成准备、私发保底牌、比牌和派奖广播。`tests/api.test.ts` 增加配置权限、持久化、错误配置拒绝及模拟草稿隔离验证。测试使用独立内存数据库，不写入既有玩家数据。
+
+原 `tests/socket_e2e.ts` 仍是需要外部服务和指定账号的手动联调脚本；自动测试使用新脚本，不依赖该账号或固定端口。
 
 ---
 

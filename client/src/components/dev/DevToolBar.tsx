@@ -20,6 +20,9 @@ export const DevToolBar: React.FC = () => {
       useGameStore.setState({
         activeSettlement: {
           winnerId: currentUser.id,
+          winnerIds: [currentUser.id],
+          payouts: [{ playerId: currentUser.id, amount: roomState.totalPot || 888 }],
+          splitPot: false,
           winAmount: roomState.totalPot || 888,
           reason: 'last_survivor',
           revealedCards: [

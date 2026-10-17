@@ -1,25 +1,12 @@
-import { Card, CardSuit, RoomState, TableSeat, UserProfile } from '../../types/game';
+import { Card, GameOverEvent, RoomState, TableSeat, UserProfile } from '../../types/game';
 import { compareHands } from '../../utils/pokerEvaluator';
 import { sound } from '../../audio/SoundManager';
 
-const SUITS: CardSuit[] = ['spades', 'hearts', 'clubs', 'diamonds'];
+import { createDeck, shuffle, showdownMultiple, splitPot, evaluateHand } from '../../../../server/src/shared/poker';
+import { dealHands } from '../../../../server/src/shared/dealing';
+import { readLocalAlgorithmConfig } from '../../services/algorithmConfig';
 
-/**
- * 生成洗乱的 52 张标准扑克牌 (Fisher-Yates 算法)
- */
-export function generateShuffledDeck(): Card[] {
-  const deck: Card[] = [];
-  for (const suit of SUITS) {
-    for (let rank = 2; rank <= 14; rank++) {
-      deck.push({ suit, rank });
-    }
-  }
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-}
+export function generateShuffledDeck(): Card[] { return shuffle(createDeck()); }
 
 export const MOCK_ME: UserProfile = {
   id: 1,
@@ -84,6 +71,7 @@ export function createInitialMockRoom(seatCount = 4): RoomState {
   return {
     roomId: '8888',
     roomName: '老友至尊局',
+    deckKind: 'standard',
     baseAnte: 10,
     turnSeconds: 20,
     gameStatus: 'waiting',
@@ -116,6 +104,7 @@ export class MockGameController {
   private secretCards: Map<number, Card[]> = new Map();
   private onStateChange: (state: RoomState) => void;
   private onPlayerBet?: (event: MockBetNotification) => void;
+  private lastSettlement: GameOverEvent | null = null;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -161,14 +150,17 @@ export class MockGameController {
    */
   public startDeal() {
     this.clearBotTimer();
-    const deck = generateShuffledDeck();
-    let cardIdx = 0;
+    const participating = this.state.seats.filter(seat => seat?.user);
+    const deal = dealHands(participating.length, readLocalAlgorithmConfig());
+    let handIndex = 0;
+    this.lastSettlement = null;
     this.secretCards.clear();
 
     sound.playDealCard();
 
     this.update((draft) => {
       draft.gameStatus = 'playing';
+      draft.deckKind = deal.deckKind;
       draft.currentRound = 1;
       draft.currentBet = draft.baseAnte;
       draft.totalPot = 0;
@@ -183,7 +175,7 @@ export class MockGameController {
           seat.user.balance -= draft.baseAnte;
           draft.totalPot += draft.baseAnte;
 
-          const cards = [deck[cardIdx++], deck[cardIdx++], deck[cardIdx++]];
+          const cards = deal.hands[handIndex++].cards;
           this.secretCards.set(seat.user.id, cards);
 
           // 仅本人在发牌后持有自己的手牌
@@ -344,7 +336,7 @@ export class MockGameController {
     let loserId = targetId;
 
     if (cardsA && cardsB) {
-      const res = compareHands(cardsA, cardsB, true);
+      const res = compareHands(cardsA, cardsB, true, this.state.deckKind);
       if (res < 0) {
         winnerId = targetId;
         loserId = initiatorId;
@@ -377,14 +369,29 @@ export class MockGameController {
    */
   public triggerSettlement(winnerId: number) {
     this.clearBotTimer();
+    this.update(draft => this.settleDraft(draft, [winnerId], 'last_survivor'));
+  }
+
+  public getLastSettlement(): GameOverEvent | null { return this.lastSettlement; }
+
+  private settleDraft(draft: RoomState, winnerIds: number[], reason: GameOverEvent['reason']) {
+    if (draft.gameStatus === 'settling') return;
     sound.playWin();
-    this.update((draft) => {
-      draft.gameStatus = 'settling';
-      const winnerSeat = draft.seats.find((s) => s?.user?.id === winnerId);
-      if (winnerSeat && winnerSeat.user) {
-        winnerSeat.user.balance += draft.totalPot;
-      }
+    draft.gameStatus = 'settling';
+    draft.currentTurnPlayerId = null;
+    draft.turnDeadline = null;
+    const payouts = splitPot(draft.totalPot, winnerIds);
+    for (const payout of payouts) {
+      const seat = draft.seats.find(s => s?.user?.id === payout.playerId);
+      if (seat?.user) seat.user.balance += payout.amount;
+    }
+    const revealedCards = draft.seats.filter(s => s?.user && (reason === 'max_round_showdown' ? s.status === 'active' : winnerIds.includes(s.user.id))).flatMap(seat => {
+      const cards = this.secretCards.get(seat!.user!.id);
+      if (!cards) return [];
+      const evaluation = evaluateHand(cards, draft.deckKind);
+      return [{ playerId: seat!.user!.id, cards, handType: evaluation.type, handTypeName: evaluation.typeName }];
     });
+    this.lastSettlement = { winnerId: winnerIds.length === 1 ? winnerIds[0] : null, winnerIds, payouts, splitPot: winnerIds.length > 1, winAmount: draft.totalPot, reason, revealedCards };
   }
 
   private advanceTurn(draft: RoomState) {
@@ -402,7 +409,12 @@ export class MockGameController {
     }
 
     if (nextIndex <= startIdx) {
-      draft.currentRound = Math.min(20, draft.currentRound + 1);
+      draft.currentRound++;
+      if (draft.currentRound > 20) {
+        const result = showdownMultiple(activeSeats.map(seat => ({ id: seat!.user!.id, cards: this.secretCards.get(seat!.user!.id)! })), draft.deckKind);
+        this.settleDraft(draft, result.winnerIds, 'max_round_showdown');
+        return;
+      }
     }
 
     draft.currentTurnPlayerId = draft.seats[nextIndex]!.user!.id;
@@ -446,7 +458,7 @@ export class MockGameController {
   private checkWinnerOrAdvance(draft: RoomState) {
     const activeSeats = draft.seats.filter((s) => s && s.user && s.status === 'active');
     if (activeSeats.length === 1 && activeSeats[0]?.user) {
-      this.triggerSettlement(activeSeats[0].user.id);
+      this.settleDraft(draft, [activeSeats[0].user.id], 'last_survivor');
     } else {
       this.advanceTurn(draft);
     }

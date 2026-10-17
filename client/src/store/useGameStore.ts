@@ -85,6 +85,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           (updatedState.currentRound === 1 && state.roomState.currentRound > 1);
         return {
           roomState: updatedState,
+          activeSettlement: updatedState.gameStatus === 'settling' ? state.mockController?.getLastSettlement() ?? null : null,
           flyingChips: isNewHandReset ? [] : state.flyingChips,
           currentUser: meSeat?.user
             ? { ...state.currentUser, balance: meSeat.user.balance }

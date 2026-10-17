@@ -49,7 +49,7 @@ App 视图流转体系
 │    ├── 角色权限物理隔离（管理员账号登录强制锁定管理端，隔离牌桌）
 │    ├── 账号管理子系统：检索、多状态筛选、开通新账号、重置密码、修改资料/封禁、安全删除
 │    ├── 充值与资金子系统：快速充减筹码、流水明细溯源、全流通筹码统计
-│    └── 发牌算法调控子系统：自然平衡/激烈碰撞/新手偏好模式、各牌型加权、个人幸运偏置、万局蒙特卡洛仿真器
+│    └── 发牌算法调控子系统：双牌库比例、互斥模式、按人数精确保底、真实发牌模拟
 └── 5. 个人战绩流水抽屉 (LedgerDrawer)
      └── 右侧划出全局抽屉：底注扣除、单局加注、获胜独揽、管理员充扣款时间戳明细与结余溯源
 ```
@@ -125,7 +125,7 @@ App 视图流转体系
 4. **终局胜出结算卡片 ([SettlementModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/SettlementModal.tsx))**：
    * 对局决出胜者时（其余全员弃牌/战败，或达到 20 轮上限亮牌），触发全屏纸屑礼花飞舞；
    * 弹出终局大捷金色奖杯卡片，展示赢家头像、独揽筹码数值（如 `+12,800 筹码`）；
-   * 若存在比牌终局，卡片下方自动展示赢家手牌与最终牌型标签；
+   * 按获奖玩家编号展示各自手牌、牌型和派奖金额；循环克制时展示平分奖池；
    * 提供“再来一局”一键重置发牌与“关闭战报”按钮。
 
 ---
@@ -150,21 +150,13 @@ App 视图流转体系
 
 ## 五、 牌型识别与裁判算法核心
 
-位于 [pokerEvaluator.ts](file:///Users/prina/Downloads/pussyGame/client/src/utils/pokerEvaluator.ts)，纯函数、强类型，供前端本地 Mock 与手牌标签计算：
+前端 [pokerEvaluator.ts](../client/src/utils/pokerEvaluator.ts) 适配共用 [poker.ts](../server/src/shared/poker.ts)，牌型标签与本地对局使用同一规则：
 
-1. **牌型等级与基础权重分**：
-   * **豹子 (Leopard)**：基数 $6,000,000 + rank$（如 AAA 为 6,000,014）；
-   * **同花顺 (Straight Flush / 顺金)**：基数 $5,000,000 + topRank$（支持 A-2-3 特殊最小顺金，最大点计为 3）；
-   * **金花 (Flush / 同花)**：基数 $4,000,000 + r_0 \times 10^4 + r_1 \times 100 + r_2$；
-   * **顺子 (Straight)**：基数 $3,000,000 + topRank$（支持 A-2-3 最小顺子）；
-   * **对子 (Pair)**：基数 $2,000,000 + pairRank \times 100 + singleRank$；
-   * **单张 (High Card / 散牌)**：基数 $1,000,000 + r_0 \times 10^4 + r_1 \times 100 + r_2$。
-2. **特殊 235 逆袭规则**：
-   * 当手牌为不同花色的 2-3-5 时，评为 `special_235`；
-   * **当且仅当对手为“豹子”时，235 逆袭获胜**；
-   * 若对手非豹子，则 235 作为普通最小散牌进行比对。
-3. **平局裁决规则**：
-   * 两者牌型点数完全相同时，**主动发起比牌挑战方判负**，严格遵循民间传统规则，防范恶意拖延。
+- 本局 `deckKind` 决定 A-2-3 或 A-8-9 最小顺子；牌桌顶部展示 52 张标准牌／28 张短牌。
+- 豹子 > 顺金 > 金花 > 顺子 > 对子 > 散牌；标准牌特殊 235 仅在与豹子直接比牌时逆袭。
+- 点数相同再比关键牌花色，顺序为黑桃 > 红桃 > 梅花 > 方块；对子比较对子中的最大花色，低 A 顺子比较 3／9。
+- 多人强制摊牌出现 235 循环克制时，存活玩家平分。结算弹窗按 `winnerIds` 和 `payouts` 展示各玩家及各自所得，亮牌通过玩家编号匹配，不依赖列表首项。
+- 仅在所有已定义比较仍相同时保留主动比牌方判负的后备处理。
 
 ---
 
@@ -191,23 +183,19 @@ App 视图流转体系
 * **快速双向充减**：支持任意玩家一键增加/扣减筹码，强制附带业务变更原因（如“老友微信转账充值”、“线下结算核减”）。
 * **全量审计日志 (Audit Log)**：每笔流水包含日志 ID、用户、变动数值、变动后余额、经办操作人、详细原因、精确时间戳，不可篡改。
 
-### 7.3 发牌算法调控系统 (Algorithm Control)
+### 7.3 发牌规则配置与真实模拟
 
-* **实现状态说明**：以下模式与参数属于现有管理端界面及设计范围。当前配置保存到浏览器本地，尚未接入联机或前端独立模拟的实际发牌；现有“仿真”按概率加权估算次数，不执行真实洗牌采样。详细状态与后续构建规则见 [发牌算法需求文档](dealing_algorithm_requirements.md)。
-* **四大运作模式**：
-  1. 自然平衡模式（Fair，各牌型自然数学概率）；
-  2. 激烈碰撞模式（Action Boost，大幅提升顺子、金花、顺金与豹子生成率，刺激对局拼注）；
-  3. 新手偏好模式（Beginner Favor，倾斜大牌概率提升对局留存）；
-  4. 自定义深度模式（Custom，允许自由拖拽滑块微调各项系数）。
-* **核心调控参数矩阵**：
-  * 豹子加权系数（0.1 ~ 5.0）、顺金加权系数（0.1 ~ 5.0）、金花加权系数（0.1 ~ 4.0）；
-  * 顺子加权系数（0.1 ~ 3.0）、对子加权系数（0.1 ~ 2.0）、散牌加权系数（0.1 ~ 2.0）；
-  * 强强对撞率（Clash Rate，0 ~ 100%）；
-  * 特殊 235 逆袭豹子加权系数（0.1 ~ 5.0）；
-  * 指定用户个人幸运偏置（$-50 \sim +50$ 幸运值）。
-* **蒙特卡洛仿真模拟器 (Monte Carlo Simulator)**：
-  * 当前管理端支持以 1,000 ~ 50,000 为样本规模，按六类牌型基础概率与权重估算次数及百分比；
-  * 调用真实发牌实现并统计实际产出分布的蒙特卡洛仿真尚待实现。
+[AlgorithmPanel.tsx](../client/src/components/AlgorithmPanel.tsx) 替代旧的牌型倍率和个人幸运值面板。
+
+- 默认标准牌 20%、短牌 80%；标准牌随机／冤家／保底为 30／40／30，短牌随机／冤家为 70／30。
+- 冤家组合默认 35／35／20／10，按实际规则产生两手强牌。
+- 对 2～8 人分别设置对子、顺子、金花、顺金、豹子的指定人数；各人数默认两手对子，其余为零，剩余人数自动随机。
+- 牌型精确生成，没有“及以上”；零不禁止自然出现。人数溢出或概率和错误会禁止保存和模拟。
+- 联机凭据通过管理员接口保存；演示凭据只保存本地演示配置。页面显示当前作用范围，保存失败明确报错，成功提示从下一局生效。
+- 草稿与已保存配置分离，恢复默认需再保存；读取失败时不能以默认草稿覆盖联机配置。
+- 支持按 2～8 人执行 1,000 或 5,000 局真实发牌模拟。分支按局、牌型按手统计，特殊 235 单列；模拟不保存草稿、不影响余额。
+
+完整字段与实现边界见 [发牌算法规范](dealing_algorithm_requirements.md)。
 
 ---
 
@@ -218,7 +206,7 @@ App 视图流转体系
 ### 8.1 纯前端 Mock 独立驱动模式 ([mockGameService.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/mock/mockGameService.ts))
 * **脱机独立运行**：在无任何 Node.js 服务端启动的环境下，前端状态机完全闭环；
 * **内置机器人 AI 调度器**：
-  * 开局自动生成 52 张真实洗乱扑克并分发暗牌（Fisher-Yates 算法）；
+  * 开局读取已保存演示配置，调用共用发牌函数选择牌库及模式并分配暗牌；
   * 自动模拟真实对手轮流出牌（30% 概率看牌、35% 概率加注，其余跟注，1.15 秒拟人化延迟）；
   * 真实比牌牌型裁决、弃牌判定、独揽结算与余额更新。
 * **底部悬浮调测工具台 ([DevToolBar.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/dev/DevToolBar.tsx))**：
@@ -247,7 +235,7 @@ App 视图流转体系
 | **排座算法** | [useTableLayout.ts](file:///Users/prina/Downloads/pussyGame/client/src/hooks/useTableLayout.ts) | 2~8 人动态三角函数第一人称居中排座与向心倾角计算 |
 | **状态管理** | [useGameStore.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/useGameStore.ts) | 牌桌状态、筹码堆队列、PK 与结算弹窗调度 |
 | | [useAuthStore.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/useAuthStore.ts) | JWT 令牌、当前登录人资料持久化与鉴权 |
-| | [mockGameService.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/mock/mockGameService.ts) | 纯前端 Fisher-Yates 洗牌、模拟对手出牌与单机闭环 |
+| | [mockGameService.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/mock/mockGameService.ts) | 调用共用发牌与裁判，按本局牌库比牌、处理循环平分及单机闭环 |
 | **网络服务** | [api.ts](file:///Users/prina/Downloads/pussyGame/client/src/services/api.ts) | HTTP RESTful 客户端（登录、个人资料、管理员专区） |
 | | [socket.ts](file:///Users/prina/Downloads/pussyGame/client/src/services/socket.ts) | Socket.io 实时信令封装与事件分发 |
 | **桌位组件** | [Card3D.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/Card3D.tsx) | 3D 轴向透视翻转、扇形重叠与花色水印扑克 |

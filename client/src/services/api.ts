@@ -1,3 +1,4 @@
+import type { AlgorithmConfig, SimulationResult } from '../../../server/src/shared/dealing';
 import { UserProfile, LedgerItem } from '../types/game';
 
 interface ApiResponse<T = unknown> {
@@ -89,17 +90,17 @@ export const api = {
 
   // 发牌算法调控
   adminGetAlgorithmConfig: () =>
-    request<unknown>('/api/admin/algorithm/config'),
+    request<AlgorithmConfig>('/api/admin/algorithm/config'),
 
-  adminSaveAlgorithmConfig: (config: unknown) =>
-    request<{ message: string }>('/api/admin/algorithm/config', {
+  adminSaveAlgorithmConfig: (config: AlgorithmConfig) =>
+    request<AlgorithmConfig>('/api/admin/algorithm/config', {
       method: 'POST',
       body: JSON.stringify(config),
     }),
 
-  adminSimulateAlgorithm: (rounds: number, config: unknown) =>
-    request<unknown>('/api/admin/algorithm/simulate', {
+  adminSimulateAlgorithm: (rounds: number, playerCount: number, config: AlgorithmConfig) =>
+    request<SimulationResult>('/api/admin/algorithm/simulate', {
       method: 'POST',
-      body: JSON.stringify({ rounds, config }),
+      body: JSON.stringify({ rounds, playerCount, config }),
     }),
 };

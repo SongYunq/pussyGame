@@ -1,3 +1,4 @@
+import type { DeckKind } from '../../../../server/src/shared/poker';
 import React, { useMemo } from 'react';
 import { TableSeat as TableSeatType } from '../../types/game';
 import { Card3D } from './Card3D';
@@ -6,6 +7,7 @@ import { Swords } from 'lucide-react';
 
 interface TableSeatProps {
   seat: TableSeatType;
+  deckKind: DeckKind;
   isMe: boolean;
   isCurrentTurn: boolean;
   turnDeadline: number | null;
@@ -21,6 +23,7 @@ interface TableSeatProps {
 
 export const TableSeat: React.FC<TableSeatProps> = ({
   seat,
+  deckKind,
   isMe,
   isCurrentTurn,
   isPKSelecting,
@@ -38,10 +41,10 @@ export const TableSeat: React.FC<TableSeatProps> = ({
   // 自身手牌识别
   const handEvaluation = useMemo(() => {
     if (isMe && seat.hasLooked && seat.cards && seat.cards.length === 3) {
-      return evaluateHand(seat.cards);
+      return evaluateHand(seat.cards, deckKind);
     }
     return null;
-  }, [isMe, seat.hasLooked, seat.cards]);
+  }, [isMe, seat.hasLooked, seat.cards, deckKind]);
 
   const isAlive = seat.status === 'active';
   const isFolded = seat.status === 'folded';
