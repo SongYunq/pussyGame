@@ -291,7 +291,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-emerald-400">3. 平局与比牌规则：</span>
                 <p className="mt-1 text-slate-300">
-                  牌型点数相同时，再按黑桃 ♠ &gt; 红桃 ♥ &gt; 梅花 ♣ &gt; 方块 ♦ 比较关键牌花色；对子取对子最大花色。仍无法区分时发起方判负。比牌不公开双方手牌。
+                  牌型点数相同时，再按黑桃 ♠ &gt; 红桃 ♥ &gt; 梅花 ♣ &gt; 方块 ♦ 比较关键牌花色；对子取对子最大花色。仍无法区分时发起方判负。比牌胜者可查看输者底牌，其他玩家与观战者不可见。
                 </p>
               </div>
 

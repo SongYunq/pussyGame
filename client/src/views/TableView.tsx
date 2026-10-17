@@ -161,6 +161,7 @@ export const TableView: React.FC<TableViewProps> = ({
         <PKClashModal
           clashEvent={activePKClash}
           seats={roomState.seats}
+          viewerId={currentUser.id}
           onClose={closePKClash}
         />
       )}
@@ -168,7 +169,7 @@ export const TableView: React.FC<TableViewProps> = ({
       {isAllInTriggered && <AllInEpicEffect info={allInInfo} />}
       {isGoldStreamTriggered && <GoldStreamer info={goldStreamInfo} />}
 
-      {activeSettlement && (
+      {activeSettlement && !activePKClash && (
         <SettlementModal
           settlementEvent={activeSettlement}
           seats={roomState.seats}

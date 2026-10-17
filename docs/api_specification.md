@@ -564,7 +564,7 @@ const socket = io("http://localhost:3000", {
       },
       "status": "active",
       "hasLooked": false,
-      "cards": null,      // 他人手牌严密屏蔽
+      "cards": null,      // 默认隐藏他人手牌；本局直接比牌胜者可取得其击败玩家的三张牌
       "currentInvested": 30,
       "isReady": true
     }
@@ -654,8 +654,8 @@ const socket = io("http://localhost:3000", {
 }
 ```
 
-#### 2. 比牌决斗结果广播：`game:compare_result` (服务端向全桌广播)
-> **绝密悬念原则**：决斗碰撞动画播放后，全桌任何人（包括旁观者与对决者自身）均**不公开彼此底牌**，仅公布裁决输赢，败者扣牌出局！
+#### 2. 比牌决斗结果：`game:compare_result` (服务端按接收者分别下发)
+> **胜者私密查看**：胜负、费用和底池发给全桌；仅实际胜者的事件附带 `loserCards`。输者、其余玩家及观战者收到的事件不包含该字段。胜者不论是发起方还是被挑战方，均可查看输者三张牌；查看不会自动将胜者自己的手牌设为已看牌。
 
 ```json
 {
@@ -667,7 +667,19 @@ const socket = io("http://localhost:3000", {
   "totalPot": 530
 }
 ```
-*前端动效表现*：屏幕中央出现两人头像的 1v1 烈焰雷霆对撞动画，随后 `loserId` 玩家头像变灰并打上“淘汰/败”印章。
+仅向上述例子的玩家 1 附加：
+```json
+{
+  "loserCards": [
+    { "suit": "spades", "rank": 10 },
+    { "suit": "hearts", "rank": 10 },
+    { "suit": "clubs", "rank": 8 }
+  ]
+}
+```
+* **快照与重连**：服务端按本局实际比牌记录维护查看权限。胜者后续收到的 `room:state.seats[*].cards` 可包含其直接击败且仍在座位上的输者手牌；除输者本人外，其他未获授权者的该座位仍为 `null`。权限不经后续胜负传递，重置房间或新局开始时清空。
+* **终局隔离**：`game:over.revealedCards` 保持原有终局亮牌规则，不添加比牌输者的私密手牌。
+* **前端动效**：对撞后，胜者在比牌弹窗看到输者三张牌及“仅你可见”提示；其他人仍看到牌背。比牌弹窗关闭后再显示终局战报，胜者也可在当前局牌桌查看已获授权的输者牌面，但牌桌不再附加“仅你可见”等小字。
 
 #### 3. 单局终局结算：`game:over`
 
@@ -763,7 +775,7 @@ export interface TableSeat {
   } | null;
   status: PlayerTableStatus;
   hasLooked: boolean;
-  cards: Card[] | null;     // 仅本人可见具体牌面，他人为 null
+  cards: Card[] | null;     // 本人手牌，或本局直接比牌胜者获准查看的输者手牌；其余为 null
   currentInvested: number;  // 本局已下注金额
   isReady: boolean;
 }

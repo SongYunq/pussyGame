@@ -1,24 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { CompareResultEvent, TableSeat } from '../../types/game';
 import { Swords, Flame, Sparkles } from 'lucide-react';
+import { Card3D } from '../table/Card3D';
 
 interface PKClashModalProps {
   clashEvent: CompareResultEvent;
   seats: (TableSeat | null)[];
+  viewerId: number;
   onClose: () => void;
 }
+
+export const PrivateLoserHand: React.FC<{ clashEvent: CompareResultEvent; viewerId: number }> = ({ clashEvent, viewerId }) => {
+  if (viewerId !== clashEvent.winnerId || clashEvent.loserCards?.length !== 3) return null;
+  return (
+    <div className="mt-3 h-24 flex flex-col items-center justify-center gap-2">
+      <div className="flex items-center">
+        {clashEvent.loserCards.map((card, index) => (
+          <Card3D key={index} card={card} isRevealed={true} fanIndex={index} size="sm" />
+        ))}
+      </div>
+      <span className="text-[10px] text-amber-300 whitespace-nowrap">败者底牌 · 仅你可见</span>
+    </div>
+  );
+};
 
 export const PKClashModal: React.FC<PKClashModalProps> = ({
   clashEvent,
   seats,
+  viewerId,
   onClose,
 }) => {
   const [animationPhase, setAnimationPhase] = useState<'approaching' | 'clashed' | 'result'>('approaching');
 
   const initiatorSeat = seats.find((s) => s?.user?.id === clashEvent.initiatorId);
   const targetSeat = seats.find((s) => s?.user?.id === clashEvent.targetId);
+  const canSeeLoserCards = viewerId === clashEvent.winnerId && clashEvent.loserCards?.length === 3;
 
   useEffect(() => {
+    setAnimationPhase('approaching');
     // 阶段1：两张卡牌对撞逼近 (400ms)
     const t1 = setTimeout(() => {
       setAnimationPhase('clashed');
@@ -29,17 +48,17 @@ export const PKClashModal: React.FC<PKClashModalProps> = ({
       setAnimationPhase('result');
     }, 1100);
 
-    // 阶段3：展示完毕自动淡出关闭 (2400ms)
+    // 胜者留出更长时间查看败者手牌，也可以手动收起。
     const t3 = setTimeout(() => {
       onClose();
-    }, 2800);
+    }, canSeeLoserCards ? 6000 : 2800);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [onClose]);
+  }, [clashEvent, onClose, canSeeLoserCards]);
 
   if (!initiatorSeat?.user || !targetSeat?.user) return null;
 
@@ -54,7 +73,7 @@ export const PKClashModal: React.FC<PKClashModalProps> = ({
           <span>绝 密 对 决</span>
           <Swords className="w-8 h-8 text-rose-500 animate-pulse scale-x-[-1]" />
         </div>
-        <div className="text-xs text-slate-400 mt-1">底牌绝密暗封 · 仅由裁判裁定胜负</div>
+        <div className="text-xs text-slate-400 mt-1">胜者可查看败者底牌 · 其他人不可见</div>
       </div>
 
       {/* 决斗舞台 */}
@@ -85,9 +104,11 @@ export const PKClashModal: React.FC<PKClashModalProps> = ({
           <span className="text-xs text-amber-400 font-mono mt-0.5">挑战者</span>
 
           {/* 暗色扑克背面 */}
-          <div className="mt-3 w-16 h-24 rounded-lg bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-900 border-2 border-amber-500/50 shadow-2xl flex items-center justify-center">
+          {animationPhase === 'result' && !isInitiatorWin && canSeeLoserCards ? (
+            <PrivateLoserHand clashEvent={clashEvent} viewerId={viewerId} />
+          ) : <div className="mt-3 w-16 h-24 rounded-lg bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-900 border-2 border-amber-500/50 shadow-2xl flex items-center justify-center">
             <span className="text-2xl text-amber-400/80">♠</span>
-          </div>
+          </div>}
         </div>
 
         {/* 中央碰撞特效区 */}
@@ -133,9 +154,11 @@ export const PKClashModal: React.FC<PKClashModalProps> = ({
           <span className="text-xs text-rose-400 font-mono mt-0.5">守擂者</span>
 
           {/* 暗色扑克背面 */}
-          <div className="mt-3 w-16 h-24 rounded-lg bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-900 border-2 border-amber-500/50 shadow-2xl flex items-center justify-center">
+          {animationPhase === 'result' && isInitiatorWin && canSeeLoserCards ? (
+            <PrivateLoserHand clashEvent={clashEvent} viewerId={viewerId} />
+          ) : <div className="mt-3 w-16 h-24 rounded-lg bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-900 border-2 border-amber-500/50 shadow-2xl flex items-center justify-center">
             <span className="text-2xl text-amber-400/80">♠</span>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -151,6 +174,11 @@ export const PKClashModal: React.FC<PKClashModalProps> = ({
             </span>
           </div>
           <span className="text-xs text-slate-400 mt-2">败者扣牌出局，筹码已累加进奖池</span>
+          {canSeeLoserCards && (
+            <button onClick={onClose} className="mt-3 px-4 py-1.5 rounded-lg border border-amber-500/40 text-xs text-amber-300 hover:bg-amber-500/10">
+              返回牌桌
+            </button>
+          )}
         </div>
       )}
     </div>

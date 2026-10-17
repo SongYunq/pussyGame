@@ -6,6 +6,9 @@ import * as gameStoreModule from '../../client/src/store/useGameStore';
 import { ActionPanel } from '../../client/src/components/table/ActionPanel';
 import { SettlementModal } from '../../client/src/components/animations/SettlementModal';
 import { TableView } from '../../client/src/views/TableView';
+import { PrivateLoserHand } from '../../client/src/components/animations/PKClashModal';
+import { TableSeat } from '../../client/src/components/table/TableSeat';
+import type { Card, CompareResultEvent } from '../../client/src/types/game';
 
 vi.mock('../../client/src/audio/SoundManager', () => ({
   sound: {
@@ -24,10 +27,89 @@ const requireClient = createRequire(new URL('../../client/package.json', import.
 const { createElement } = requireClient('react');
 const { renderToStaticMarkup } = requireClient('react-dom/server');
 
+const strongHand: Card[] = [{ rank: 14, suit: 'spades' }, { rank: 14, suit: 'hearts' }, { rank: 12, suit: 'clubs' }];
+const weakHand: Card[] = [{ rank: 10, suit: 'diamonds' }, { rank: 11, suit: 'spades' }, { rank: 13, suit: 'hearts' }];
+
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
+});
+
+describe('Private loser hand frontend', () => {
+  it.each([true, false])('reveals the loser hand only when the local player wins=%s', (wins) => {
+    useGameStore.getState().setMockSeatCount(3);
+    useGameStore.getState().dealCards();
+    const controller = useGameStore.getState().mockController!;
+    controller.getSecretHand(1)!.splice(0, 3, ...(wins ? strongHand : weakHand));
+    controller.getSecretHand(2)!.splice(0, 3, ...(wins ? weakHand : strongHand));
+    useGameStore.getState().compareWithPlayer(2);
+    const state = useGameStore.getState();
+    const event = state.activePKClash!;
+    expect(state.roomState.seats[0]!.hasLooked).toBe(false);
+    if (wins) {
+      expect(event.loserCards).toEqual(weakHand);
+      expect(state.roomState.seats[1]!.cards).toEqual(weakHand);
+    } else {
+      expect(event).not.toHaveProperty('loserCards');
+      expect(state.roomState.seats[1]!.cards).toBeNull();
+    }
+    const handMarkup = renderToStaticMarkup(createElement(PrivateLoserHand, { clashEvent: event, viewerId: 1 }));
+    expect(handMarkup.includes('败者底牌 · 仅你可见')).toBe(wins);
+
+    const seatMarkup = renderToStaticMarkup(createElement(TableSeat, {
+      seat: state.roomState.seats[1], deckKind: state.roomState.deckKind,
+      isMe: false, isCurrentTurn: false, turnDeadline: null, isPKSelecting: false,
+      onSelectPKTarget: vi.fn(), xPercent: 50, yPercent: 20,
+      cardXPercent: 50, cardYPercent: 30, cardAngleDeg: 180,
+    }));
+    expect(seatMarkup).not.toContain('仅你可见');
+
+    useGameStore.getState().dealCards();
+    expect(useGameStore.getState().activePKClash).toBeNull();
+    expect(useGameStore.getState().roomState.seats[1]!.cards).toBeNull();
+  });
+
+  it('lets the local defending winner see the initiating loser without revealing the local hand', () => {
+    const { controller } = startMock();
+    controller.getSecretHand(1)!.splice(0, 3, ...strongHand);
+    controller.getSecretHand(2)!.splice(0, 3, ...weakHand);
+    expect(controller.compare(2, 1).loserCards).toEqual(weakHand);
+    expect(controller.getState().seats[1]!.cards).toEqual(weakHand);
+    expect(controller.getState().seats[0]!.hasLooked).toBe(false);
+  });
+
+  it.each([2, 3, 999])('renders no private hand for a losing or unrelated viewer %i', (viewerId) => {
+    const event: CompareResultEvent = { initiatorId: 1, targetId: 2, winnerId: 1, loserId: 2, cost: 10, totalPot: 40, loserCards: weakHand };
+    expect(renderToStaticMarkup(createElement(PrivateLoserHand, { clashEvent: event, viewerId }))).toBe('');
+  });
+
+  it('shows the comparison before settlement in a two-player game', () => {
+    useGameStore.getState().setMockSeatCount(2);
+    useGameStore.getState().dealCards();
+    const controller = useGameStore.getState().mockController!;
+    controller.getSecretHand(1)!.splice(0, 3, ...strongHand);
+    controller.getSecretHand(2)!.splice(0, 3, ...weakHand);
+    useGameStore.getState().compareWithPlayer(2);
+    const state = useGameStore.getState();
+    expect(state.activeSettlement).not.toBeNull();
+    const hook = vi.spyOn(gameStoreModule, 'useGameStore').mockReturnValue(state);
+    try {
+      const markup = renderToStaticMarkup(createElement(TableView));
+      expect(markup).toContain('绝 密 对 决');
+      expect(markup).not.toContain('终 局 大 捷');
+    } finally {
+      hook.mockRestore();
+    }
+    useGameStore.getState().closePKClash();
+    const afterClose = useGameStore.getState();
+    const nextHook = vi.spyOn(gameStoreModule, 'useGameStore').mockReturnValue(afterClose);
+    try {
+      expect(renderToStaticMarkup(createElement(TableView))).toContain('终 局 大 捷');
+    } finally {
+      nextHook.mockRestore();
+    }
+  });
 });
 
 describe('Frontend cyclic settlement', () => {

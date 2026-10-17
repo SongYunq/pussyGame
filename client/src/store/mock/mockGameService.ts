@@ -359,7 +359,7 @@ export class MockGameController {
   /**
    * 发起比牌 PK
    */
-  public compare(initiatorId: number, targetId: number): { winnerId: number; loserId: number } {
+  public compare(initiatorId: number, targetId: number): { winnerId: number; loserId: number; loserCards?: Card[] } {
     this.clearBotTimer();
     sound.playPKClash();
 
@@ -388,13 +388,20 @@ export class MockGameController {
       const loserSeat = draft.seats.find((s) => s?.user?.id === loserId);
       if (loserSeat) {
         loserSeat.status = 'lost';
+        if (winnerId === MOCK_ME.id) {
+          loserSeat.cards = this.secretCards.get(loserId)!.map(card => ({ ...card }));
+        }
       }
 
       this.checkWinnerOrAdvance(draft);
     });
 
     this.scheduleBotTurnIfNeeded();
-    return { winnerId, loserId };
+    return {
+      winnerId,
+      loserId,
+      ...(winnerId === MOCK_ME.id ? { loserCards: this.secretCards.get(loserId)!.map(card => ({ ...card })) } : {}),
+    };
   }
 
   /**

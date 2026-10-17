@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { Card, RoomState, TableSeat } from '../types/index.js';
+import { Card, CompareResultEvent, RoomState, TableSeat } from '../types/index.js';
 import { DeckKind, splitPot } from '../shared/poker.js';
 import { dealHands } from '../shared/dealing.js';
 import { AlgorithmModel } from '../models/algorithmModel.js';
@@ -35,6 +35,7 @@ export class Room {
   private settlingTimer: NodeJS.Timeout | null = null;
   private firstTurnSeatInRound: number = 0;
   private hasTriggeredFirstGold: boolean = false;
+  private comparisonWins: Map<number, Set<number>> = new Map();
   private io?: Server;
 
   constructor(options: RoomOptions) {
@@ -197,6 +198,7 @@ export class Room {
     this.totalPot = this.baseAnte * activeSeats.length;
     this.deckKind = deal.deckKind;
     this.hasTriggeredFirstGold = false;
+    this.comparisonWins.clear();
     activeSeats.forEach((seat, index) => {
       seat.user!.balance = payments[index].balance;
       seat.currentInvested = this.baseAnte;
@@ -431,17 +433,28 @@ export class Room {
     // 输家淘汰
     const loserSeat = loserId === initiatorId ? initSeat : targetSeat;
     loserSeat.status = 'lost';
+    const visibleLosers = this.comparisonWins.get(winnerId) ?? new Set<number>();
+    visibleLosers.add(loserId);
+    this.comparisonWins.set(winnerId, visibleLosers);
 
-    // 广播决斗结果（绝密绝不公开双方底牌）
+    // 按接收者分别发送：仅本次胜者取得输者底牌，支持同账号多连接。
     if (this.io) {
-      this.io.to(`room:${this.roomId}`).emit('game:compare_result', {
+      const event: CompareResultEvent = {
         initiatorId,
         targetId: targetPlayerId,
         winnerId,
         loserId,
         cost,
         totalPot: this.totalPot,
-      });
+      };
+      const socketIds = this.io.sockets.adapter.rooms.get(`room:${this.roomId}`);
+      for (const socketId of socketIds ?? []) {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (!socket) continue;
+        socket.emit('game:compare_result', (socket as any).userId === winnerId
+          ? { ...event, loserCards: loserSeat.cards!.map(card => ({ ...card })) }
+          : event);
+      }
     }
 
     // 检查是否决出唯一赢家
@@ -588,6 +601,7 @@ export class Room {
    */
   public resetToWaiting(): void {
     this.clearTurnTimer();
+    this.comparisonWins.clear();
     if (this.settlingTimer) { clearTimeout(this.settlingTimer); this.settlingTimer = null; }
     this.gameStatus = 'waiting';
     this.currentRound = 0;
@@ -657,17 +671,18 @@ export class Room {
 
   /**
    * 生成防作弊脱敏全量快照
-   * 仅当前请求者本人能查看自己底牌，其他人的 cards 强制为 null
+   * 仅本人手牌及本局直接击败玩家的手牌可见，其他人的 cards 为 null
    */
   public getMaskedState(forUserId?: number): RoomState {
     const maskedSeats: (TableSeat | null)[] = this.seats.map((seat) => {
       if (!seat) return null;
       const isSelf = forUserId !== undefined && seat.user?.id === forUserId;
+      const isDefeatedByViewer = forUserId !== undefined && seat.status === 'lost' && seat.user !== null
+        && this.comparisonWins.get(forUserId)?.has(seat.user.id) === true;
       return {
         ...seat,
         user: seat.user ? { ...seat.user } : null,
-        // 只有自己且游戏在进行或结算中时展示，其余人皆为 null
-        cards: isSelf ? seat.cards : null,
+        cards: isSelf || isDefeatedByViewer ? seat.cards?.map(card => ({ ...card })) ?? null : null,
       };
     });
 

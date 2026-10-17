@@ -54,7 +54,7 @@ export interface TableSeat {
   } | null;
   status: PlayerTableStatus;
   hasLooked: boolean;
-  cards: Card[] | null;     // 仅本人可见具体牌面，他人为 null
+  cards: Card[] | null;     // 本人或本局直接比牌胜者可见，其余视角为 null
   currentInvested: number;  // 本局已下注金额
   isReady: boolean;
 }
@@ -95,6 +95,7 @@ export interface CompareResultEvent {
   loserId: number;
   cost: number;
   totalPot: number;
+  loserCards?: Card[]; // 仅本次比牌胜者的事件包含输者手牌
 }
 
 // 终局亮牌手牌

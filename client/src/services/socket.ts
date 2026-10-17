@@ -39,7 +39,7 @@ class SocketService {
 
     this.socket.on('game:start', () => {
       sound.playDealCard();
-      useGameStore.setState({ hasTriggeredFirstGold: false });
+      useGameStore.setState({ hasTriggeredFirstGold: false, activePKClash: null, isPKSelecting: false });
     });
 
     this.socket.on('game:player_looked', (data: { nickname: string }) => {

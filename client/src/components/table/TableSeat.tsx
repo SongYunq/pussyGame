@@ -49,6 +49,7 @@ export const TableSeat: React.FC<TableSeatProps> = ({
   const isAlive = seat.status === 'active';
   const isFolded = seat.status === 'folded';
   const isLost = seat.status === 'lost';
+  const canSeeDefeatedHand = !isMe && isLost && seat.cards?.length === 3;
   const canBePKTarget = isPKSelecting && !isMe && isAlive;
   const hasCards = seat.status !== 'empty' && seat.status !== 'sitting';
 
@@ -77,10 +78,10 @@ export const TableSeat: React.FC<TableSeatProps> = ({
                 <Card3D
                   key={idx}
                   card={card}
-                  isRevealed={seat.hasLooked && (isMe || Boolean(seat.cards))}
+                  isRevealed={isMe ? seat.hasLooked : canSeeDefeatedHand}
                   fanIndex={idx}
                   size={isMe ? 'md' : 'sm'}
-                  isFolded={isFolded || isLost}
+                  isFolded={isFolded || (isLost && !canSeeDefeatedHand)}
                 />
               );
             })}

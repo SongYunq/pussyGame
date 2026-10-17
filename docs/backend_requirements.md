@@ -65,7 +65,7 @@
 1. **绝对权威防作弊（Zero-Trust Client）**：
    - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](file:///Users/prina/Downloads/pussyGame/server/src/game/GameReferee.ts) 与 [`Room`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 严格决断；
    - 客户端只能上报操作意图（如 `game:look`, `game:bet`, `game:compare`），服务端严密校验合法性；
-   - **单连接单独脱敏**：服务端下发全桌快照时，向 Socket A 发送的数据中，除 Socket A 自己的底牌外，其余玩家的手牌强制置为 `null`；观战者视角全员手牌为 `null`。
+   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌，以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
 2. **原子金融级账本（ACID SQLite Transactions）**：
    - 玩家入座直接使用钱包账户余额，所有底注、跟注、加注、比牌扣除与胜利奖金派发，均在 SQLite `db.transaction()` 中原子完成；
    - 绝不允许“先下注成功、写库失败”的脏数据，余额非负强约束，杜绝刷币与坏账；
@@ -309,7 +309,10 @@ export type PlayerTableStatus =
 2. **比牌扣费**：发起方需支付比牌费用，金额为：
    $$\text{PK Cost} = \text{currentBet} \times 2 \times (\text{发起方已看牌} ? 1 : 0.5)$$
    即发起方一次跟注金额的 2 倍：闷牌为单注基准的 1 倍，明牌为 2 倍。
-3. **绝密原则**：比牌过程双方的手牌绝不对全场公开，也不向对方公开具体底牌，由裁判引擎计算后仅广播 `winnerId` 与 `loserId`；
+3. **胜者私密查看**：实际胜者可查看输者三张牌，防守获胜也适用；`game:compare_result` 遍历房间内的鉴权连接分别发送，只有胜者的连接包含 `loserCards`，其他接收者仅有公共胜负与费用。禁止把含私密牌面的对象广播到整个房间。
+   - `Room.comparisonWins` 按用户编号记录本局直接击败的玩家；不改变任何人的 `hasLooked`，不继承输者此前获得的查看权限。
+   - 后续快照、断线重连恢复及同账号多连接均按该记录授权；重置及成功开始新局时清空。未实际比牌、弃牌、无效请求或扣款失败不能授予查看权限。
+   - 比牌输者手牌不加入公共 `game:over.revealedCards`；终局原有亮牌规则保持不变。
 4. **失败者处理**：失败者状态标记为 `lost`，失去后续操作权；
 5. **胜者检查**：若淘汰后场上仅剩 1 名存活玩家，立即收官派奖。
 
@@ -330,8 +333,10 @@ public getMaskedState(forUserId?: number): RoomState {
     return {
       ...seat,
       user: seat.user ? { ...seat.user } : null,
-      // 只有自己才能拿到非空的 cards 数组，他人一律下发 null！
-      cards: isSelf ? seat.cards : null,
+      // 仅本人及本局直接比牌胜者获准查看对应手牌。
+      cards: isSelf || (forUserId !== undefined && seat.status === 'lost' && seat.user !== null
+        && this.comparisonWins.get(forUserId)?.has(seat.user.id) === true)
+        ? seat.cards?.map(card => ({ ...card })) ?? null : null,
     };
   });
   // ... 返回脱敏后的房间状态快照
@@ -463,12 +468,13 @@ if (fs.existsSync(config.clientDistPath)) {
   3. 看牌状态切换为明注（下注 1 倍，闷牌下注 0.5 倍）；
   4. 绝密 PK 比牌、胜负淘汰与奖池累加；
   5. 仅剩一人存活时自动结算派奖与庄家更替；
-  6. 脱敏广播：除本人外手牌强制为 null。
+  6. 开局脱敏：除本人外手牌强制为 null；比牌后的查看另按直接胜者权限执行。
 
 * 下注倍率专项测试见 `tests/betting.test.ts`：覆盖底注原额扣除、明牌 1 倍与闷牌 0.5 倍跟注、加注后的跟注、全押基准折算、比牌费用、余额与流水一致性，以及扣款失败时保留原单注基准。
 * 前端金额回归测试见 `tests/frontend-betting.test.ts`：覆盖模拟对局扣款、动作事件金额、比牌弹窗费用、按钮余额门槛与高额下注特效判定。
 * 思考时间测试见 [turn-timer.test.ts](../server/tests/turn-timer.test.ts)：模拟等待 24 小时，验证无限制房间不自动弃牌、开局及轮换没有截止时间、下一局保留设置，且限时超时弃牌与结算重置仍正常执行。
 * [frontend-betting.test.ts](../server/tests/frontend-betting.test.ts) 同时验证大厅创建设置进入模拟控制器并跨开局／操作保持，以及牌桌“无限制”显示。
+* [compare-privacy.test.ts](../server/tests/compare-privacy.test.ts) 验证发起方／被挑战方获胜授权、观战隔离、权限不继承、无效比牌、新局清空及快照副本独立；前端测试覆盖私密牌面、非胜者隐藏、模拟对局和比牌后终局弹窗顺序。
 
 ### 8.3 RESTful API 完整鉴权与账本单测 (`tests/api.test.ts`)
 * **12 项测试**：
@@ -484,6 +490,8 @@ if (fs.existsSync(config.clientDistPath)) {
 `tests/dealing-socket.test.ts` 自动创建临时本机服务，以两个独立鉴权客户端完成准备、私发保底牌、比牌和派奖广播。`tests/api.test.ts` 增加配置权限、持久化、错误配置拒绝及模拟草稿隔离验证。测试使用独立内存数据库，不写入既有玩家数据。
 
 [dealing-socket.test.ts](../server/tests/dealing-socket.test.ts) 还验证真实 `room:create` 收到 `turnSeconds: 0` 后，创建、开局、下注轮换和断线重连下发的房间状态均保持 `turnSeconds: 0`、`turnDeadline: null`。
+
+该联机套件同时使用四名在局玩家、一名观战者及胜者额外窗口，验证比牌事件和快照的私密牌面隔离、连胜权限不传递、重连恢复及终局战报不泄漏输者手牌。
 
 原 `tests/socket_e2e.ts` 仍是需要外部服务和指定账号的手动联调脚本；自动测试使用新脚本，不依赖该账号或固定端口。
 

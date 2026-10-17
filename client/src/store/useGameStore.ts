@@ -157,11 +157,14 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ isMuted: muted });
     },
 
-    createMockRoom: (options) => controller.createRoom(options),
+    createMockRoom: (options) => {
+      set({ activePKClash: null, isPKSelecting: false });
+      return controller.createRoom(options);
+    },
 
     setMockSeatCount: (count: number) => {
       const { mockController } = get();
-      set({ flyingChips: [], hasTriggeredFirstGold: false });
+      set({ flyingChips: [], hasTriggeredFirstGold: false, activePKClash: null, isPKSelecting: false });
       if (mockController) {
         mockController.setSeatCount(count);
       }
@@ -169,7 +172,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     dealCards: () => {
       const { mockController } = get();
-      set({ flyingChips: [], hasTriggeredFirstGold: false });
+      set({ flyingChips: [], hasTriggeredFirstGold: false, activePKClash: null, isPKSelecting: false });
       if (mockController) {
         mockController.startDeal();
       }
@@ -212,7 +215,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ isPKSelecting: false });
 
       if (mockController) {
-        const { winnerId, loserId } = mockController.compare(currentUser.id, targetPlayerId);
+        const { winnerId, loserId, loserCards } = mockController.compare(currentUser.id, targetPlayerId);
         const mySeat = roomState.seats.find((s) => s?.user?.id === currentUser.id);
         const cost = roomState.currentBet * 2 * (mySeat?.hasLooked ? 1 : 0.5);
         const clashEvent: CompareResultEvent = {
@@ -222,6 +225,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           loserId,
           cost,
           totalPot: roomState.totalPot + cost,
+          ...(currentUser.id === winnerId && loserCards ? { loserCards } : {}),
         };
 
         // 弹出 1v1 绝密对撞动画
