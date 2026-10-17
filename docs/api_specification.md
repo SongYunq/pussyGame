@@ -611,7 +611,7 @@ const socket = io("http://localhost:3000", {
 ```json
 {
   "actionType": "raise", // "call" (跟注) | "raise" (加注) | "allin" (全押)
-  "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 1000 | 5000 | "allin"
+  "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 500 | 1000 | 5000 | 8000 | 10000 | "allin"
   "amount": 50          // 可选；实际扣款由服务端按明牌 1 倍、闷牌 0.5 倍计算，不信任客户端金额
 }
 ```
@@ -624,7 +624,7 @@ const socket = io("http://localhost:3000", {
   "amount": 50,
   "totalPot": 430,
   "playerBalance": 9750,
-  "specialEffect": null // "none" | "gold" (5000+ 专属金光) | "allin" (All-in 全场震颤雷电)
+  "specialEffect": null // "none" | "gold" (本局首次 5000+ 全屏大金盛典与女声播报) | "allin" (All-in 全押特效)
 }
 ```
 

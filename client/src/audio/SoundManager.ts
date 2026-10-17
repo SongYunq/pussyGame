@@ -5,10 +5,15 @@
 class SoundManager {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private firstGoldAudio: HTMLAudioElement | null = null;
 
   constructor() {
     // 从 localStorage 读取静音配置
     this.isMuted = localStorage.getItem('zjh_sound_muted') === 'true';
+    if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
+      this.firstGoldAudio = new Audio('/audio/first_gold.mp3');
+      this.firstGoldAudio.preload = 'auto';
+    }
   }
 
   private initContext() {
@@ -24,6 +29,10 @@ class SoundManager {
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     localStorage.setItem('zjh_sound_muted', String(this.isMuted));
+    if (this.isMuted && this.firstGoldAudio) {
+      this.firstGoldAudio.pause();
+      this.firstGoldAudio.currentTime = 0;
+    }
     return this.isMuted;
   }
 
@@ -276,6 +285,62 @@ class SoundManager {
       // 忽略
     }
   }
+
+  /**
+   * 7. 首次 5000+ 大金全屏盛典号角与预录制真人感女声播报
+   * 播报音频：/audio/first_gold.mp3（“恭喜大金！豪气冲天，一掷千金，全场瞩目！”）
+   */
+  public playFirstGoldAnnouncement(_nickname?: string, _amount?: number) {
+    if (this.isMuted) return;
+
+    // 1) Web Audio 皇家金锣与升调华丽和弦前奏
+    try {
+      this.initContext();
+      if (this.ctx) {
+        const now = this.ctx.currentTime;
+        const fanfareNotes = [523.25, 659.25, 783.99, 1046.5, 1318.51]; // C5 E5 G5 C6 E6
+        fanfareNotes.forEach((freq, idx) => {
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = idx === fanfareNotes.length - 1 ? 'sine' : 'triangle';
+          const startTime = now + idx * 0.065;
+          const duration = idx === fanfareNotes.length - 1 ? 0.65 : 0.28;
+
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0.2, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.008, startTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(startTime);
+          osc.stop(startTime + duration + 0.02);
+        });
+      }
+    } catch {
+      // 忽略音频上下文错误
+    }
+
+    // 2) 播放预录制真人感女声 MP3（/audio/first_gold.mp3）
+    try {
+      if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
+        if (!this.firstGoldAudio) {
+          this.firstGoldAudio = new Audio('/audio/first_gold.mp3');
+        }
+        this.firstGoldAudio.pause();
+        this.firstGoldAudio.currentTime = 0;
+        this.firstGoldAudio.volume = 1.0;
+        this.firstGoldAudio.play().catch(() => {
+          // 忽略浏览器自动播放限制
+        });
+      }
+    } catch {
+      // 忽略播放异常
+    }
+  }
 }
 
 export const sound = new SoundManager();
+

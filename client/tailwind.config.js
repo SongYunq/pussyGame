@@ -25,9 +25,13 @@ export default {
       },
       keyframes: {
         'allin-shake': {
-          '0%, 100%': { transform: 'translate(0, 0)' },
-          '10%, 30%, 50%, 70%, 90%': { transform: 'translate(-3px, 2px)' },
-          '20%, 40%, 60%, 80%': { transform: 'translate(3px, -2px)' },
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)' },
+          '12%': { transform: 'translate3d(-6px, 4px, 0) scale(1.008)' },
+          '24%': { transform: 'translate3d(6px, -4px, 0) scale(1.006)' },
+          '36%': { transform: 'translate3d(-5px, -3px, 0) scale(1.004)' },
+          '48%': { transform: 'translate3d(5px, 3px, 0) scale(1.002)' },
+          '64%': { transform: 'translate3d(-3px, 2px, 0)' },
+          '80%': { transform: 'translate3d(2px, -1px, 0)' },
         },
         'gold-stream': {
           '0%': { backgroundPosition: '0% 50%' },
@@ -42,7 +46,7 @@ export default {
         },
       },
       animation: {
-        'allin-shake': 'allin-shake 0.4s ease-in-out',
+        'allin-shake': 'allin-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97)',
         'gold-stream': 'gold-stream 3s ease infinite',
         'float-up': 'float-up 2.5s ease-out forwards',
       },

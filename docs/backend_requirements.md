@@ -302,7 +302,7 @@ export type PlayerTableStatus =
   * **已看牌（明注）**：下注额 = `currentBet`；
   * **加注（Raise）**：玩家传入新的加注档位（必须大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
   * **全押（All-in）**：扣除玩家当前全部余额 `balance`，按 `balance / (hasLooked ? 1 : 0.5)` 折算单注。若折算值大于当前 `currentBet`，则抬高单注基准；
-* **下注特效广播**：单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（金光流幅），All-in 标记为 `specialEffect: 'allin'`（全屏震颤）。
+* **下注特效广播**：每局首次单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（全屏大金盛典与女声播报），All-in 标记为 `specialEffect: 'allin'`（全押特效）。
 
 ### 4.5 绝密比牌 (PK 对决) 机制
 1. **触发门槛**：轮到自己出牌、对局处于第 2 轮及以后、比牌对象必须同处于 `active` 存活状态；

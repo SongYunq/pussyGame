@@ -34,6 +34,7 @@ export class Room {
   private turnTimer: NodeJS.Timeout | null = null;
   private settlingTimer: NodeJS.Timeout | null = null;
   private firstTurnSeatInRound: number = 0;
+  private hasTriggeredFirstGold: boolean = false;
   private io?: Server;
 
   constructor(options: RoomOptions) {
@@ -195,6 +196,7 @@ export class Room {
     this.currentBet = this.baseAnte;
     this.totalPot = this.baseAnte * activeSeats.length;
     this.deckKind = deal.deckKind;
+    this.hasTriggeredFirstGold = false;
     activeSeats.forEach((seat, index) => {
       seat.user!.balance = payments[index].balance;
       seat.currentInvested = this.baseAnte;
@@ -319,11 +321,12 @@ export class Room {
     seat.currentInvested += payAmount;
     this.totalPot += payAmount;
 
-    // 特效判定
+    // 特效判定（5000+ 大金特效每局仅在首次达到时触发）
     let specialEffect: 'none' | 'gold' | 'allin' = 'none';
     if (actionType === 'allin') {
       specialEffect = 'allin';
-    } else if (payAmount >= 5000) {
+    } else if (payAmount >= 5000 && !this.hasTriggeredFirstGold) {
+      this.hasTriggeredFirstGold = true;
       specialEffect = 'gold';
     }
 

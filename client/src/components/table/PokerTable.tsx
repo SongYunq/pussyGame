@@ -12,6 +12,7 @@ interface PokerTableProps {
   onSelectPKTarget: (targetPlayerId: number) => void;
   floatingBubbles: FloatingBubble[];
   flyingChips: FlyingChip[];
+  isAllInTriggered?: boolean;
 }
 
 /**
@@ -67,17 +68,30 @@ export const PokerTable: React.FC<PokerTableProps> = ({
   onSelectPKTarget,
   floatingBubbles,
   flyingChips,
+  isAllInTriggered = false,
 }) => {
   const calculatedSeats = useTableLayout(roomState.seats, myUserId);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center p-3 select-none overflow-hidden">
       {/* 牌桌主体椭圆外框 */}
-      <div className="relative w-full max-w-4xl h-[480px] md:h-[560px] rounded-[180px] md:rounded-[240px] poker-rim bg-gradient-to-b from-[#2b1704] via-[#1a0e02] to-[#2b1704] p-3 md:p-4 border-4 border-amber-600/40 shadow-2xl">
+      <div
+        className={`relative w-full max-w-4xl h-[480px] md:h-[560px] rounded-[180px] md:rounded-[240px] poker-rim bg-gradient-to-b from-[#2b1704] via-[#1a0e02] to-[#2b1704] p-3 md:p-4 border-4 transition-shadow duration-500 ${
+          isAllInTriggered
+            ? 'animate-allin-shake border-amber-400/90 shadow-[0_0_70px_rgba(220,38,38,0.65),0_0_30px_rgba(251,191,36,0.5)]'
+            : 'border-amber-600/40 shadow-2xl'
+        }`}
+      >
         {/* 内层深色高档绿色毛呢桌面 */}
         <div className="relative w-full h-full rounded-[160px] md:rounded-[220px] poker-felt-texture border-2 border-emerald-500/20 flex items-center justify-center">
-          {/* 桌面暗色金线装饰椭圆 */}
-          <div className="absolute inset-8 rounded-[140px] md:rounded-[200px] border border-amber-400/15 pointer-events-none" />
+          {/* 桌面暗色金线装饰椭圆（全押时泛起赤金流光） */}
+          <div
+            className={`absolute inset-8 rounded-[140px] md:rounded-[200px] border pointer-events-none transition-all duration-500 ${
+              isAllInTriggered
+                ? 'border-amber-400/50 shadow-[inset_0_0_45px_rgba(220,38,38,0.35)]'
+                : 'border-amber-400/15'
+            }`}
+          />
 
           {/* 正中央偏上：无光晕半透明全息金字 */}
           <div className="relative z-30 -translate-y-12 md:-translate-y-14 pointer-events-none flex flex-col items-center justify-center">

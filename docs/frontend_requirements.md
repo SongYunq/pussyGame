@@ -104,15 +104,17 @@ App 视图流转体系
   * **性能与防爆炸熔断**：单人面前最多保留 15 摞筹码或累计 60,000 筹码，全桌上限 75 摞或 250,000 底池，超出阈值平滑转为静默数字累加。
 
 ### 3.4 专属震撼高潮特效
-1. **5000+ 高额加注金色流幅 ([GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx))**：
-   * 当单次下注金额 $\ge 5000$ 时触发；
-   * 屏幕上方弹出金光离子横幅：“豪气冲天 · 大额加注！单手掷注 5,000+，全场目光聚集！”；
-   * 伴随旋转星芒与金币跳跃，持续 2.5 秒淡出。
-2. **All-in 屏幕雷电全押震颤 ([AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx))**：
-   * 玩家点击“全押”时触发；
-   * 屏幕四周激活 8px 暗红雷电暗角与全屏心跳震颤动效（`allin-shake`）；
-   * 两侧闪电劈落，屏幕中央弹出带烈焰烈火图标的金色 All-in 浮空徽章（“孤注一掷 · 绝境亮剑”）；
-   * 音频引擎同步播放双脉冲深沉心跳与雷鸣声（`playAllIn()`），沉浸感拉满。
+1. **首次 5000+ 全屏大金盛典与女声播报 ([GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx))**：
+   * **触发条件**：每局牌中，当**首次**出现单次实际押注金额 $\ge 5000$（5000 或 5000+）时全桌同步触发（同一局后续 5000+ 押注不再重复触发全屏阻断）；
+   * **全屏占满与全桌操作锁定**：以 `fixed inset-0 z-[100] pointer-events-auto` 占满整个屏幕并拦截所有点击/触摸交互，同时锁定底部操作面板与 AI 出牌回合，持续 4.2 秒，期间所有人无法操作；
+   * **皇家大金盛典视觉与动态金额**：全屏黑金毛玻璃底幕配合居中旋转的皇家太阳金芒射线、漫天鎏金星尘粒子与 3D 浮雕“恭喜大金”主舞台，画面动态展示**玩家昵称**与**实际押注金额**（`首次下注 {amount} 码`，严格与实际押注金额相符）；
+   * **预录制真人感女声播报**：同步调用 [`SoundManager.playFirstGoldAnnouncement()`](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts#L293)，先奏响皇家庆典和弦，随后播放预录制的高品质中文女声 MP3 音频文件 [`/audio/first_gold.mp3`](file:///Users/prina/Downloads/pussyGame/client/public/audio/first_gold.mp3)（*“恭喜大金！豪气冲天，一掷千金，全场瞩目！”*）。
+2. **All-in 边缘流光与顶部战报特效 ([AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx))**：
+   * 玩家点击“全押”或收到全押广播时触发，持续 2.0 秒平滑进退场；
+   * **零遮挡中央视野**：屏幕中央 64% 区域保持完全通透，不放置任何遮挡牌桌、底池或筹码柱的中央弹窗；
+   * **四周电影感赤金暗角与火星粒子**：屏幕外圈柔和赤红暗角脉冲（`animate-allin-vignette`）、上下边缘能量锋线，以及左右两侧外沿升腾的赤金火星粒子（`animate-allin-ember`）；
+   * **顶部悬浮流光战报横幅**：在顶部状态栏下方弹出黑金赤焰胶囊战报（`animate-allin-banner`），表面伴随高光扫掠（`animate-allin-sheen`），动态展示 `ALL IN` 金属字样、全押玩家昵称及全押金额；
+   * **牌桌本体震动与桌沿流光**：联动 [PokerTable.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/PokerTable.tsx) 触发牌桌本体冲击震颤（`allin-shake`）与桌沿金红脉冲光晕，音频引擎同步播放双脉冲深沉心跳重低音（`playAllIn()`）。
 3. **绝密比牌决斗 (PK 碰撞对决 [PKClashModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/PKClashModal.tsx))**：
    * **发起流程**：第 2 轮及之后开放比牌；点击“比牌”按钮，牌桌所有存活对手头像亮起红色呼吸光圈并浮现“点击对决”靶心；
    * **消耗倍率**：扣除自身一次跟注金额的 2 倍，即闷牌扣除单注基准的 1 倍、明牌扣除 2 倍；
@@ -130,9 +132,9 @@ App 视图流转体系
 
 ---
 
-## 四、 纯代码拟真音效系统 (Web Audio API)
+## 四、 拟真音效与语音系统 (Web Audio API + 预录制语音)
 
-位于 [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts)，无需下载外部音频资产，零网络等待、零跨域问题：
+位于 [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts)，结合 Web Audio API 实时合成与预录制真人感女声播报：
 
 | 音效方法 | 物理拟真声学原理 | 触发时机 |
 | :--- | :--- | :--- |
@@ -143,6 +145,7 @@ App 视图流转体系
 | `playPKClash()` | 160Hz $\to$ 40Hz 锯齿波轰鸣 + 0.2s 爆炸白噪声脉冲 | 1v1 比牌两牌碰撞瞬间 |
 | `playAllIn()` | 90Hz $\to$ 35Hz 双心跳脉冲（顿-顿）重低音波 | 点击全押（All-in）瞬间 |
 | `playWin()` | C 大调大三和弦琶音（C5-523Hz, E5-659Hz, G5-784Hz, C6-1046Hz） | 终局结算、胜者独揽奖池 |
+| `playFirstGoldAnnouncement()` | 皇家升调五音庆典琶音 + 播放预录制女声 MP3（`/audio/first_gold.mp3`：“恭喜大金！豪气冲天，一掷千金，全场瞩目！”） | 每局首次押注达到 5000 或 5000+ 时 |
 
 * **静音开关**：全站右上角支持一键静音/取消静音，状态自动持久化于本地 `localStorage.getItem('zjh_sound_muted')`。
 

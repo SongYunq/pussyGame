@@ -94,6 +94,7 @@ export interface MockBetNotification {
   actionType: 'call' | 'raise' | 'allin';
   chipValue: number;
   actualAmount: number;
+  isDevTool?: boolean;
 }
 
 /**
@@ -106,6 +107,7 @@ export class MockGameController {
   private onPlayerBet?: (event: MockBetNotification) => void;
   private lastSettlement: GameOverEvent | null = null;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasTriggeredGoldInHand: boolean = false;
 
   constructor(
     onStateChange: (state: RoomState) => void,
@@ -142,6 +144,7 @@ export class MockGameController {
     this.clearBotTimer();
     this.state = createInitialMockRoom(count);
     this.secretCards.clear();
+    this.hasTriggeredGoldInHand = false;
     this.onStateChange(this.state);
   }
 
@@ -155,6 +158,7 @@ export class MockGameController {
     let handIndex = 0;
     this.lastSettlement = null;
     this.secretCards.clear();
+    this.hasTriggeredGoldInHand = false;
 
     sound.playDealCard();
 
@@ -246,11 +250,19 @@ export class MockGameController {
       }
     });
 
-    if (notification && this.onPlayerBet) {
-      this.onPlayerBet(notification);
+    let isFirstGold = false;
+    if (notification) {
+      const betInfo = notification as MockBetNotification;
+      if (betInfo.actionType !== 'allin' && betInfo.actualAmount >= 5000 && !this.hasTriggeredGoldInHand) {
+        this.hasTriggeredGoldInHand = true;
+        isFirstGold = true;
+      }
+      if (this.onPlayerBet) {
+        this.onPlayerBet(betInfo);
+      }
     }
 
-    this.scheduleBotTurnIfNeeded();
+    this.scheduleBotTurnIfNeeded(isFirstGold ? 4300 : 1150);
   }
 
   /**
@@ -288,7 +300,7 @@ export class MockGameController {
       const displayAmount =
         actionType === 'allin'
           ? 5000
-          : targetSeat.hasLooked
+          : chipValue >= 5000 || targetSeat.hasLooked
             ? chipValue
             : chipValue * 0.5;
 
@@ -300,6 +312,7 @@ export class MockGameController {
         actionType,
         chipValue,
         actualAmount: displayAmount,
+        isDevTool: true,
       };
     });
 
@@ -421,7 +434,7 @@ export class MockGameController {
     draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
   }
 
-  private scheduleBotTurnIfNeeded() {
+  private scheduleBotTurnIfNeeded(delayMs = 1150) {
     this.clearBotTimer();
     if (this.state.gameStatus !== 'playing') return;
 
@@ -452,7 +465,7 @@ export class MockGameController {
       } else {
         this.bet(botId, 'call', this.state.currentBet);
       }
-    }, 1150);
+    }, delayMs);
   }
 
   private checkWinnerOrAdvance(draft: RoomState) {

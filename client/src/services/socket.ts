@@ -39,6 +39,7 @@ class SocketService {
 
     this.socket.on('game:start', () => {
       sound.playDealCard();
+      useGameStore.setState({ hasTriggeredFirstGold: false });
     });
 
     this.socket.on('game:player_looked', (data: { nickname: string }) => {
@@ -52,6 +53,7 @@ class SocketService {
         actionType: 'call' | 'raise' | 'allin';
         amount: number;
         chipOption: number;
+        specialEffect?: 'none' | 'gold' | 'allin';
       }) => {
         const state = useGameStore.getState();
         const seat = state.roomState.seats.find((s) => s?.user?.id === data.playerId);
@@ -67,10 +69,20 @@ class SocketService {
           sound.playChip();
         }
 
-        if (data.actionType === 'allin') {
-          state.triggerAllInEffect();
-        } else if (data.amount >= 5000) {
-          state.triggerGoldStreamEffect();
+        if (data.actionType === 'allin' || data.specialEffect === 'allin') {
+          state.triggerAllInEffect({
+            playerId: data.playerId,
+            amount: data.amount,
+          });
+        } else if (
+          data.specialEffect === 'gold' ||
+          (data.specialEffect === undefined && data.amount >= 5000 && !state.hasTriggeredFirstGold)
+        ) {
+          useGameStore.setState({ hasTriggeredFirstGold: true });
+          state.triggerGoldStreamEffect({
+            playerId: data.playerId,
+            amount: data.amount,
+          });
         }
       }
     );
