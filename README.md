@@ -12,10 +12,11 @@
   * 专属加注动效 (+10 ~ +1000 快捷筹码抛投，5000+ 金光特效，All-in 全场震颤动效)
   * 绝密比牌决斗 (PK 烈焰对撞，绝密悬念不公开底牌)
   * 拟真 Web Audio API 声音系统 (发牌擦音、筹码金属声、胜利音效)
-  * 独立 Mock 调试机制
+  * 独立 Mock 调试机制，与联机服务端共用发牌和裁判规则
+  * 可调牌库比例、冤家模式及 2～8 人精确牌型保底，支持真实发牌模拟
 
 * **后端 (Server)**：Node.js + Express + Socket.io + SQLite (`better-sqlite3`)
-  * 服务端权威裁判逻辑 (52张无王，经典大众规则：不同花色 235 遇豹子逆袭，同牌型发起者负)
+  * 服务端权威裁判逻辑 (标准牌／短牌双牌库均无王，花色不全相同的 235 遇豹子逆袭，同点数按花色决胜，循环克制平分底池)
   * 独立经济系统 (SQLite 用户表与筹码流水明细，账号余额直通在桌下注)
   * 房主/管理员后台 (`/admin`)：发号、充减筹码、重置密码与全局流水审计
   * 单服务单端口生产部署 (Express 统一托管前端构建产物与 WebSocket)
@@ -26,4 +27,6 @@
 
 * [前端专属设计需求与交互规范](docs/frontend_requirements.md)
 * [后端专属设计需求与架构规范](docs/backend_requirements.md)
+* [发牌玩法规则](dealing_rules.md)
+* [发牌算法需求、构建规则与变更同步规范](docs/dealing_algorithm_requirements.md)
 * [前后端通信协议规范 (API & WebSocket Spec)](docs/api_specification.md)

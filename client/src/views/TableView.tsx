@@ -27,6 +27,7 @@ export const TableView: React.FC<TableViewProps> = ({
     isAllInTriggered,
     isGoldStreamTriggered,
     floatingBubbles,
+    flyingChips,
     isMuted,
     toggleMute,
     dealCards,
@@ -70,7 +71,7 @@ export const TableView: React.FC<TableViewProps> = ({
               </span>
             </div>
             <span className="text-[10px] text-slate-400">
-              底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds}s
+              {roomState.deckKind === 'short' ? '28 张短牌' : '52 张标准牌'} · 底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds}s
             </span>
           </div>
         </div>
@@ -131,6 +132,7 @@ export const TableView: React.FC<TableViewProps> = ({
           isPKSelecting={isPKSelecting}
           onSelectPKTarget={compareWithPlayer}
           floatingBubbles={floatingBubbles}
+          flyingChips={flyingChips}
         />
       </main>
 
@@ -138,6 +140,7 @@ export const TableView: React.FC<TableViewProps> = ({
       <ActionPanel
         mySeat={mySeat}
         isMyTurn={isMyTurn}
+        baseAnte={roomState.baseAnte}
         currentBet={roomState.currentBet}
         currentRound={roomState.currentRound}
         gameStatus={roomState.gameStatus}

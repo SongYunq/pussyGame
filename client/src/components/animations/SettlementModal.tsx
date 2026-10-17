@@ -17,7 +17,9 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   onClose,
   onNextRound,
 }) => {
-  const winnerSeat = seats.find((s) => s?.user?.id === settlementEvent.winnerId);
+  const winnerIds = settlementEvent.winnerIds ?? (settlementEvent.winnerId === null ? [] : [settlementEvent.winnerId]);
+  const winners = seats.filter(seat => seat?.user && winnerIds.includes(seat.user.id));
+  const shared = winnerIds.length > 1;
 
   useEffect(() => {
     // 燃放胜利礼花
@@ -32,7 +34,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     }
   }, []);
 
-  if (!winnerSeat?.user) return null;
+  if (!winners.length) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in select-none">
@@ -45,46 +47,26 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         {/* 标题 */}
         <div className="mt-8 text-center">
           <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-100 tracking-wider">
-            终 局 大 捷
+            {shared ? '平 分 奖 池' : '终 局 大 捷'}
           </h2>
           <span className="text-xs text-slate-400">
-            {settlementEvent.reason === 'last_survivor' ? '对手悉数出局，一人独揽全池' : '打满20轮巅峰对决开牌结算'}
+            {shared ? '235 循环克制，存活玩家平分底池' : settlementEvent.reason === 'last_survivor' ? '对手悉数出局，一人独揽全池' : '打满20轮巅峰对决开牌结算'}
           </span>
         </div>
 
-        {/* 赢家头像与信息 */}
-        <div className="mt-5 flex flex-col items-center">
-          <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-lg ring-4 ring-amber-400/20">
-            {winnerSeat.user.avatar}
-          </div>
-          <span className="mt-2 text-base font-extrabold text-slate-100">
-            {winnerSeat.user.nickname}
-          </span>
+        <div className="mt-5 w-full max-h-[50vh] overflow-y-auto space-y-4">
+          {winners.map(winnerSeat => {
+            const user = winnerSeat!.user!;
+            const payout = settlementEvent.payouts?.find(p => p.playerId === user.id)?.amount ?? settlementEvent.winAmount;
+            const revealed = settlementEvent.revealedCards.find(hand => hand.playerId === user.id);
+            return <div key={user.id} className="flex flex-col items-center rounded-2xl border border-amber-500/20 p-3">
+              <div className="text-3xl">{user.avatar}</div>
+              <span className="mt-1 font-bold text-slate-100">{user.nickname}</span>
+              <div className="mt-2 flex items-center gap-2 text-amber-400 font-black"><Coins className="w-4 h-4" />+{payout.toLocaleString()} 筹码</div>
+              {revealed && <><div className="mt-3 flex justify-center items-center gap-1">{revealed.cards.map((card, index) => <Card3D key={index} card={card} isRevealed={true} fanIndex={index} size="sm" />)}</div><span className="mt-2 text-xs font-bold text-amber-400">{revealed.handTypeName}</span></>}
+            </div>;
+          })}
         </div>
-
-        {/* 独揽筹码数值 */}
-        <div className="mt-4 flex items-center gap-2 bg-amber-500/10 border border-amber-500/40 px-5 py-2 rounded-2xl shadow-inner">
-          <Coins className="w-6 h-6 text-amber-400 animate-bounce" />
-          <span className="text-2xl font-black font-mono text-amber-400">
-            +{settlementEvent.winAmount.toLocaleString()}
-          </span>
-          <span className="text-xs text-amber-300/80 font-bold">筹码</span>
-        </div>
-
-        {/* 赢家牌型 (如有亮牌) */}
-        {settlementEvent.revealedCards && settlementEvent.revealedCards.length > 0 && (
-          <div className="mt-5 w-full flex flex-col items-center">
-            <span className="text-xs text-slate-400 mb-2">获胜牌型：</span>
-            <div className="flex justify-center items-center gap-1">
-              {settlementEvent.revealedCards[0].cards.map((c, i) => (
-                <Card3D key={i} card={c} isRevealed={true} fanIndex={i} size="sm" />
-              ))}
-            </div>
-            <span className="mt-2 text-xs font-bold text-amber-400 bg-amber-950/60 px-3 py-0.5 rounded-full border border-amber-500/30">
-              {settlementEvent.revealedCards[0].handTypeName}
-            </span>
-          </div>
-        )}
 
         {/* 底部按钮 */}
         <div className="mt-6 w-full flex gap-3">

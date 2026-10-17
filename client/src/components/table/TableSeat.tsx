@@ -1,3 +1,4 @@
+import type { DeckKind } from '../../../../server/src/shared/poker';
 import React, { useMemo } from 'react';
 import { TableSeat as TableSeatType } from '../../types/game';
 import { Card3D } from './Card3D';
@@ -6,6 +7,7 @@ import { Swords } from 'lucide-react';
 
 interface TableSeatProps {
   seat: TableSeatType;
+  deckKind: DeckKind;
   isMe: boolean;
   isCurrentTurn: boolean;
   turnDeadline: number | null;
@@ -21,6 +23,7 @@ interface TableSeatProps {
 
 export const TableSeat: React.FC<TableSeatProps> = ({
   seat,
+  deckKind,
   isMe,
   isCurrentTurn,
   isPKSelecting,
@@ -38,10 +41,10 @@ export const TableSeat: React.FC<TableSeatProps> = ({
   // 自身手牌识别
   const handEvaluation = useMemo(() => {
     if (isMe && seat.hasLooked && seat.cards && seat.cards.length === 3) {
-      return evaluateHand(seat.cards);
+      return evaluateHand(seat.cards, deckKind);
     }
     return null;
-  }, [isMe, seat.hasLooked, seat.cards]);
+  }, [isMe, seat.hasLooked, seat.cards, deckKind]);
 
   const isAlive = seat.status === 'active';
   const isFolded = seat.status === 'folded';
@@ -51,10 +54,12 @@ export const TableSeat: React.FC<TableSeatProps> = ({
 
   return (
     <>
-      {/* 1. 内圈手牌区：位于头像靠向牌桌中央的方向，并根据座位角度朝向中心 */}
+      {/* 1. 内圈手牌区：位于头像靠向牌桌中央的方向，并根据座位角度朝向中心（自身手牌置于筹码层之上） */}
       {hasCards && (
         <div
-          className="absolute -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-500 ease-out select-none"
+          className={`absolute -translate-x-1/2 -translate-y-1/2 ${
+            isMe ? 'z-30' : 'z-10'
+          } transition-all duration-500 ease-out select-none`}
           style={{
             left: `${cardXPercent}%`,
             top: `${cardYPercent}%`,
@@ -92,7 +97,7 @@ export const TableSeat: React.FC<TableSeatProps> = ({
 
       {/* 2. 外圈头像与信息区：贴靠牌桌边缘 */}
       <div
-        className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center select-none transition-all duration-500 ease-out ${
+        className={`absolute -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center select-none transition-all duration-500 ease-out ${
           canBePKTarget ? 'cursor-pointer scale-105' : ''
         }`}
         style={{

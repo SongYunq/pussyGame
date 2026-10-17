@@ -1,30 +1,6 @@
-// 卡牌花色
-export type CardSuit = 'spades' | 'hearts' | 'clubs' | 'diamonds'; // 黑桃, 红桃, 梅花, 方块
-
-// 卡牌定义 (rank: 2~14，14 代表 A)
-export interface Card {
-  suit: CardSuit;
-  rank: number;
-}
-
-// 牌型等级定义
-export type HandRankType =
-  | 'special_235'      // 特殊 235 (不同花色 235 遇豹子逆袭)
-  | 'high_card'        // 单张 (散牌)
-  | 'pair'             // 对子
-  | 'straight'         // 顺子
-  | 'flush'            // 金花 (同花)
-  | 'straight_flush'   // 同花顺 (顺金)
-  | 'leopard';         // 豹子 (三张相同)
-
-// 牌型评估结果
-export interface HandEvaluation {
-  type: HandRankType;
-  typeName: string;
-  weight: number;       // 基础等级权重 (1: high_card, 2: pair, 3: straight, 4: flush, 5: straight_flush, 6: leopard, 7: special_235)
-  ranks: number[];      // 用于同牌型比对的大小序列，从高到低
-  cards: Card[];
-}
+import type { DeckKind } from '../shared/poker.js';
+export type { CardSuit, Card, HandRankType, EvaluatedHand as HandEvaluation } from '../shared/poker.js';
+import type { Card } from '../shared/poker.js';
 
 // 玩家在桌状态
 export type PlayerTableStatus =
@@ -55,13 +31,14 @@ export interface TableSeat {
 export interface RoomState {
   roomId: string;
   roomName: string;
+  deckKind: DeckKind;
   baseAnte: number;
   turnSeconds: number;
   gameStatus: 'waiting' | 'playing' | 'settling';
   currentRound: number;
   currentTurnPlayerId: number | null;
   turnDeadline: number | null;
-  currentBet: number;
+  currentBet: number;       // 明牌单注基准，闷牌下注为其一半；不影响开局底注
   totalPot: number;
   dealerSeatIndex: number;
   seats: (TableSeat | null)[];

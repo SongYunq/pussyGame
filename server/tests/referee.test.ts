@@ -35,7 +35,7 @@ describe('GameReferee - Hand Evaluation', () => {
     expect(res.typeName).toContain('豹子');
   });
 
-  it('should identify Straight Flush (同花顺)', () => {
+  it('should identify Straight Flush (顺金)', () => {
     const hand: Card[] = [
       { suit: 'hearts', rank: 10 },
       { suit: 'hearts', rank: 11 },
@@ -46,7 +46,7 @@ describe('GameReferee - Hand Evaluation', () => {
     expect(res.weight).toBe(5);
   });
 
-  it('should identify A-2-3 Straight Flush (最小同花顺)', () => {
+  it('should identify A-2-3 Straight Flush (最小顺金)', () => {
     const hand: Card[] = [
       { suit: 'spades', rank: 14 },
       { suit: 'spades', rank: 2 },
@@ -111,7 +111,7 @@ describe('GameReferee - Hand Evaluation', () => {
     expect(GameReferee.compareHands(pair1, pair2, 'A')).toBe(1);
   });
 
-  it('should identify Special 2-3-5 (不同花色235)', () => {
+  it('should identify Special 2-3-5 (花色不全相同235)', () => {
     const special235: Card[] = [
       { suit: 'spades', rank: 5 },
       { suit: 'hearts', rank: 3 },
@@ -142,7 +142,7 @@ describe('GameReferee - Comparison and Special Rules', () => {
     { suit: 'hearts', rank: 14 },
     { suit: 'hearts', rank: 13 },
     { suit: 'hearts', rank: 12 },
-  ]; // 这是同花顺
+  ]; // 这是顺金
   const flushA95: Card[] = [
     { suit: 'hearts', rank: 14 },
     { suit: 'hearts', rank: 9 },
@@ -184,7 +184,7 @@ describe('GameReferee - Comparison and Special Rules', () => {
     expect(GameReferee.compareHands(leopardAAA, leopard222, 'A')).toBe(1);
   });
 
-  it('Tie breaker: Initiator loses when hands and ranks are identical', () => {
+  it('Tie breaker: suit wins first; identical cards retain the initiator fallback', () => {
     const hand1: Card[] = [
       { suit: 'spades', rank: 12 },
       { suit: 'hearts', rank: 11 },
@@ -196,8 +196,9 @@ describe('GameReferee - Comparison and Special Rules', () => {
       { suit: 'spades', rank: 10 },
     ];
 
-    // 当 A 主动发起比牌时，同牌同点 A 判负 (返回 -1)
-    expect(GameReferee.compareHands(hand1, hand2, 'A')).toBe(-1);
+    // 点数相同先比较最大牌 Q 的花色，黑桃胜梅花。
+    expect(GameReferee.compareHands(hand1, hand2, 'A')).toBe(1);
+    expect(GameReferee.compareHands(hand1, hand1, 'A')).toBe(-1);
 
     // 当 B 主动发起比牌时，同牌同点 B 判负 (即 A 获胜，返回 1)
     expect(GameReferee.compareHands(hand1, hand2, 'B')).toBe(1);

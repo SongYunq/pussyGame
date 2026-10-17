@@ -277,28 +277,28 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-amber-400">1. 牌型权重从大到小：</span>
                 <p className="mt-1 font-mono text-slate-300">
-                  豹子 (AAA &gt; ... &gt; 222) &gt; 同花顺 (顺金) &gt; 金花 (同花) &gt; 顺子 &gt; 对子 &gt; 单张 (散牌)
+                  豹子 (AAA &gt; ... &gt; 222) &gt; 顺金 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 (散牌)
                 </p>
               </div>
 
               <div className="p-3 bg-slate-950 rounded-xl border border-amber-500/20">
                 <span className="font-bold text-rose-400">2. 特殊 235 逆袭规则：</span>
                 <p className="mt-1 text-slate-300">
-                  不同花色的 2-3-5，当场上有“豹子”比牌时，<strong>235 逆袭大于所有豹子</strong>；若场上无豹子，则作为最小散牌。
+                  52 张牌局中，非金花 2-3-5 与豹子直接比牌时获胜，其余按最小散牌处理；多人摊牌形成循环克制时，存活玩家平分底池。
                 </p>
               </div>
 
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-emerald-400">3. 平局与比牌规则：</span>
                 <p className="mt-1 text-slate-300">
-                  牌型点数完全相同时，<strong>主动发起比牌者判负</strong>；比牌绝密暗封，不公开双方手牌。
+                  牌型点数相同时，再按黑桃 ♠ &gt; 红桃 ♥ &gt; 梅花 ♣ &gt; 方块 ♦ 比较关键牌花色；对子取对子最大花色。仍无法区分时发起方判负。比牌不公开双方手牌。
                 </p>
               </div>
 
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-blue-400">4. 明注与暗注：</span>
                 <p className="mt-1 text-slate-300">
-                  未看牌（闷牌）下注为 1 倍；已看牌（明注）必须下注 2 倍；单局上限 20 轮强制全开结算。
+                  开局底注按原额扣除；后续未看牌（闷牌）按当前单注的 0.5 倍下注，已看牌（明注）按 1 倍下注；加注后同样折算。单局上限 20 轮强制全开结算。52 张牌局 A-2-3 最小，28 张短牌局 A-8-9 最小。
                 </p>
               </div>
             </div>

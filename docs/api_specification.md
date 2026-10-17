@@ -2,6 +2,8 @@
 
 本文档旨在为**前端独立开发、Mock 联调以及后续后端实现**提供标准权威的契约规范。前后端开发严格遵循此协议。
 
+发牌算法的构建规则、实现状态与变更同步要求见 [dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
+
 ---
 
 ## 目录
@@ -349,89 +351,113 @@ interface ApiResponse<T = any> {
 }
 ```
 
-#### 9. 获取当前发牌算法调控配置
-* **路径**：`GET /api/admin/algorithm/config`
-* **响应数据**：
-```json
-{
-  "code": 200,
-  "message": "ok",
-  "data": {
-    "mode": "fair",              // "fair" | "action_boost" | "beginner_favor" | "custom"
-    "leopardWeight": 1.0,        // 豹子权重系数 (0.1 ~ 5.0)
-    "straightFlushWeight": 1.0,  // 顺金权重系数 (0.1 ~ 5.0)
-    "flushWeight": 1.0,          // 金花权重系数 (0.1 ~ 4.0)
-    "straightWeight": 1.0,       // 顺子权重系数 (0.1 ~ 3.0)
-    "pairWeight": 1.0,           // 对子权重系数 (0.1 ~ 2.0)
-    "highCardWeight": 1.0,       // 散牌权重系数 (0.1 ~ 2.0)
-    "clashRate": 25,             // 强强碰撞率 (0 ~ 100%)
-    "special235Boost": 1.0,      // 特殊235逆袭杀豹子权重 (0.1 ~ 5.0)
-    "playerLuckWeights": {}      // 用户ID -> 幸运加权 (-50 ~ +50)
-  }
-}
-```
+#### 9. 获取当前发牌配置
 
-#### 10. 保存发牌算法调控配置
-* **路径**：`POST /api/admin/algorithm/config`
-* **请求体**：
-```json
-{
-  "mode": "action_boost",
-  "leopardWeight": 2.2,
-  "straightFlushWeight": 2.0,
-  "flushWeight": 1.8,
-  "straightWeight": 1.5,
-  "pairWeight": 1.0,
-  "highCardWeight": 0.8,
-  "clashRate": 50,
-  "special235Boost": 2.5,
-  "playerLuckWeights": {
-    "1": 15
-  }
-}
-```
-* **响应数据**：
-```json
-{
-  "code": 200,
-  "message": "发牌算法调控参数保存成功并已立即生效"
-}
-```
+- 路径：`GET /api/admin/algorithm/config`。
+- 已实现；要求登录且具有管理员身份，未登录返回 401，普通玩家返回 403。
+- 成功返回 `{ code: 200, message: "ok", data: AlgorithmConfig }`，默认 `data` 如下：
 
-#### 11. 执行发牌算法蒙特卡洛仿真模拟测试
-* **路径**：`POST /api/admin/algorithm/simulate`
-* **请求体**：
 ```json
 {
-  "rounds": 1000,
-  "config": {
-    "leopardWeight": 2.0,
-    "straightFlushWeight": 1.8,
-    "flushWeight": 1.5,
-    "straightWeight": 1.2,
-    "pairWeight": 1.0,
-    "highCardWeight": 0.8
-  }
-}
-```
-* **响应数据**：
-```json
-{
-  "code": 200,
-  "message": "仿真模拟计算完成",
-  "data": {
-    "totalRounds": 1000,
-    "stats": {
-      "leopard": { "count": 5, "percentage": 0.5 },
-      "straightFlush": { "count": 4, "percentage": 0.4 },
-      "flush": { "count": 72, "percentage": 7.2 },
-      "straight": { "count": 41, "percentage": 4.1 },
-      "pair": { "count": 182, "percentage": 18.2 },
-      "highCard": { "count": 696, "percentage": 69.6 }
+  "version": 1,
+  "deckProbabilities": {
+    "standard": 20,
+    "short": 80
+  },
+  "standardModes": {
+    "random": 30,
+    "rival": 40,
+    "guarantee": 30
+  },
+  "shortModes": {
+    "random": 70,
+    "rival": 30
+  },
+  "rivalWeights": {
+    "big_pair": 35,
+    "straight": 35,
+    "flush": 20,
+    "premium": 10
+  },
+  "guarantees": {
+    "2": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "3": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "4": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "5": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "6": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "7": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
+    },
+    "8": {
+      "pair": 2,
+      "straight": 0,
+      "flush": 0,
+      "straight_flush": 0,
+      "leopard": 0
     }
   }
 }
 ```
+
+每组概率范围为 0～100，组内合计 100%。所有七种人数方案都必须提供，五种牌型人数为非负整数，合计不能超过对应人数。`version` 必须为 1。服务端只保存校验后的完整新配置，旧的模式倍率和个人幸运格式不再适用。
+
+#### 10. 保存发牌配置
+
+- 路径：`POST /api/admin/algorithm/config`，管理员鉴权。
+- 请求体为第 9 项的完整 `AlgorithmConfig` 对象。
+- 成功：`{ code: 200, message: "发牌配置已保存，从下一局开始生效", data: AlgorithmConfig }`。
+- 配置以 `dealing_config_v1` 写入 `game_settings`，每个房间下一次开局读取；不改变当前局牌库或已经生成的手牌。
+- 校验失败返回 HTTP 400 和 `{ code: 400, message, data: null }`，已保存配置保持不变；页面不得把失败显示为保存成功。
+
+#### 11. 执行真实发牌模拟
+
+- 路径：`POST /api/admin/algorithm/simulate`，管理员鉴权。
+- 请求：`{ rounds: number, playerCount: number, config?: AlgorithmConfig }`。
+- `rounds` 为 1～5,000 的整数，`playerCount` 为 2～8 的整数；提供 `config` 时使用该草稿，否则读取已保存配置。模拟不保存草稿、不改玩家余额。
+- 成功包裹仍为 `{ code: 200, message, data }`；数据字段如下：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `algorithmVersion` | 当前发牌算法版本，`2.0.0` |
+| `totalRounds`、`playerCount`、`totalHands` | 实际模拟局数、人数、总手数；总手数等于局数乘人数 |
+| `branches` | `standard_random`、`standard_rival`、`standard_guarantee`、`short_random`、`short_rival` 五项实际局数 |
+| `stats` | 以 `HandRankType` 为键，每项包含 `count` 和 `percentage`；按手统计，特殊 235 单列、不重复计入散牌 |
+
+请求超限、人数非法或草稿配置无效时返回 HTTP 400。模拟调用与正式牌局相同的发牌函数，统计来自实际采样。
 
 ---
 
@@ -496,6 +522,7 @@ const socket = io("http://localhost:3000", {
 ```json
 {
   "roomId": "8888",
+  "deckKind": "standard", // 本局牌库类型，贯穿比牌与结算
   "roomName": "老友聚会局",
   "baseAnte": 10,
   "turnSeconds": 20,
@@ -503,7 +530,7 @@ const socket = io("http://localhost:3000", {
   "currentRound": 3,      // 当前对局进行到第几轮 (上限 20 轮)
   "currentTurnPlayerId": 1, // 当前该谁操作
   "turnDeadline": 1799889920000, // 倒计时截止时间戳 (前端做本地进度条与倒数)
-  "currentBet": 20,       // 当前单注基准（看牌者以此注 * 2 下注）
+  "currentBet": 20,       // 当前明牌单注基准（明牌下注 20，闷牌下注 10；开局底注另按 baseAnte 扣除）
   "totalPot": 380,        // 桌面中央奖池总筹码
   "dealerSeatIndex": 0,   // 庄家座位索引
   "seats": [              // 动态 8 个座位数组 (无人的位置为 null)
@@ -555,6 +582,7 @@ const socket = io("http://localhost:3000", {
 ```json
 {
   "round": 1,
+  "deckKind": "standard", // 本局牌库类型
   "dealerId": 1,
   "baseAnte": 10,
   "totalPot": 30,
@@ -568,7 +596,7 @@ const socket = io("http://localhost:3000", {
 
 #### 2. 看牌操作
 * **客户端发出**：`game:look`
-* **说明**：玩家本地触发 3D 翻牌动效，向服务端上报状态；服务端记录该玩家 `hasLooked: true`，后续下注金额强制翻倍。
+* **说明**：玩家本地触发 3D 翻牌动效，向服务端上报状态；服务端记录该玩家 `hasLooked: true`，后续按 `currentBet` 的 1 倍下注；未看牌时为 0.5 倍。开局底注始终按 `baseAnte` 原额扣除。
 * **服务端向全桌广播**：`game:player_looked`
 ```json
 {
@@ -582,9 +610,9 @@ const socket = io("http://localhost:3000", {
 * **入参**：
 ```json
 {
-  "actionType": "call", // "call" (跟注) | "raise" (加注) | "allin" (全押)
+  "actionType": "raise", // "call" (跟注) | "raise" (加注) | "allin" (全押)
   "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 1000 | 5000 | "allin"
-  "amount": 100         // 最终根据明注/暗注折算后的实际扣款筹码
+  "amount": 50          // 可选；实际扣款由服务端按明牌 1 倍、闷牌 0.5 倍计算，不信任客户端金额
 }
 ```
 * **服务端广播**：`game:player_bet` (触发筹码飞入底池动效)
@@ -593,9 +621,9 @@ const socket = io("http://localhost:3000", {
   "playerId": 1,
   "actionType": "raise",
   "chipOption": 50,
-  "amount": 100,
-  "totalPot": 480,
-  "playerBalance": 9700,
+  "amount": 50,
+  "totalPot": 430,
+  "playerBalance": 9750,
   "specialEffect": null // "none" | "gold" (5000+ 专属金光) | "allin" (All-in 全场震颤雷电)
 }
 ```
@@ -615,7 +643,7 @@ const socket = io("http://localhost:3000", {
 ### 4.4 特效广播与比牌决斗 (Animation & Showdown)
 
 #### 1. 发起双人比牌 (PK)
-* **条件**：第 2 轮起开放，比牌花费为当前单注的 2 倍（已看牌按明注倍率算）。
+* **条件**：第 2 轮起开放，比牌花费为发起方一次跟注金额的 2 倍（闷牌为 `currentBet` 的 1 倍，明牌为 2 倍）。
 * **客户端发出**：`game:compare`
 * **入参**：
 ```json
@@ -633,34 +661,38 @@ const socket = io("http://localhost:3000", {
   "targetId": 2,
   "winnerId": 1,
   "loserId": 2,
-  "cost": 40,
-  "totalPot": 520
+  "cost": 100,
+  "totalPot": 530
 }
 ```
 *前端动效表现*：屏幕中央出现两人头像的 1v1 烈焰雷霆对撞动画，随后 `loserId` 玩家头像变灰并打上“淘汰/败”印章。
 
-#### 3. 单局终局结算：`game:over` (服务端向全桌广播)
-当场上仅剩 1 位未弃牌玩家，或打满 20 轮全员开牌时触发：
-```json
+#### 3. 单局终局结算：`game:over`
+
+单人存活或超过 20 轮强制摊牌时触发。事件结构：
+
+```typescript
 {
-  "winnerId": 1,
-  "winAmount": 520,
-  "reason": "last_survivor", // "last_survivor" (其他人全弃牌/比牌出局) | "max_round_showdown" (打满20轮全开比大小)
-  "revealedCards": [         // 终局亮牌列表（若因其他人全弃牌获胜，赢家可选择亮牌或不亮）
-    {
-      "playerId": 1,
-      "cards": [
-        { "suit": "spades", "rank": 14 },
-        { "suit": "hearts", "rank": 14 },
-        { "suit": "diamonds", "rank": 14 }
-      ],
-      "handType": "leopard", // "leopard" (豹子) | "flush_straight" (顺金) | "flush" (金花) | "straight" (顺子) | "pair" (对子) | "high_card" (散牌) | "special_235" (235)
-      "handTypeName": "豹子 AAA"
-    }
-  ]
+  winnerId: number | null; // 唯一胜者编号；平分时为 null
+  winnerIds: number[]; // 全部获奖玩家
+  payouts: Array<{ playerId: number; amount: number }>; // 各自所得
+  splitPot: boolean;
+  winAmount: number; // 本次分配的总底池，不是每人所得
+  reason: 'last_survivor' | 'max_round_showdown';
+  revealedCards: Array<{
+    playerId: number;
+    cards: Card[];
+    handType: HandRankType;
+    handTypeName: string;
+  }>;
 }
 ```
-*前端动效表现*：中央奖池筹码以流光弧线全数飞入赢家座位，播放金币欢呼胜利音效，弹出结算战报卡片（3秒后重置准备状态）。
+
+循环克制示例：`winnerId: null`、`winnerIds: [1, 2, 3]`、`splitPot: true`；底池 30 时三笔 `payouts` 各为 10。平分仅包含仍参与摊牌的人，弃牌和比牌出局者不分奖。所有派奖的余额及流水原子提交后才广播。
+
+强制摊牌公开全部存活手牌，单人获胜公开赢家手牌。前端按 `playerId` 匹配各获奖者的牌面和金额。单人胜出更新庄家，平分保持原庄家；服务端 4 秒后重置准备状态。
+
+`room:state` 与 `game:start` 只新增公开的 `deckKind`，不提供发牌模式、冤家或保底身份。
 
 ---
 
@@ -701,12 +733,12 @@ export interface Card {
 
 // 牌型等级定义
 export type HandRankType =
-  | 'special_235'      // 特殊 235 (不同花色 235 遇豹子逆袭)
+  | 'special_235'      // 特殊 235 (花色不全相同 235 遇豹子逆袭)
   | 'high_card'        // 单张 (散牌)
   | 'pair'             // 对子
   | 'straight'         // 顺子
-  | 'flush'            // 金花 (同花)
-  | 'straight_flush'   // 同花顺 (顺金)
+  | 'flush'            // 金花
+  | 'straight_flush'   // 顺金
   | 'leopard';         // 豹子 (三张相同)
 
 // 玩家在桌状态
@@ -738,6 +770,7 @@ export interface TableSeat {
 export interface RoomState {
   roomId: string;
   roomName: string;
+  deckKind: 'standard' | 'short';
   baseAnte: number;
   turnSeconds: number;
   gameStatus: 'waiting' | 'playing' | 'settling';

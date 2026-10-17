@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
+import { AlgorithmPanel } from '../components/AlgorithmPanel';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   Shield,
@@ -10,20 +11,14 @@ import {
   Trash2,
   Edit3,
   Sliders,
-  RefreshCw,
   Search,
-  Filter,
   LogOut,
   CheckCircle2,
   AlertTriangle,
-  Play,
-  Sparkles,
   TrendingUp,
   Activity,
-  Check,
   X,
   CreditCard,
-  Percent,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -55,32 +50,6 @@ export interface ChipAuditLog {
   type: 'recharge' | 'deduct';
 }
 
-export interface AlgorithmConfig {
-  mode: 'fair' | 'action_boost' | 'beginner_favor' | 'custom';
-  leopardWeight: number;      // 豹子权重 (0.1 ~ 5.0)
-  straightFlushWeight: number; // 顺金权重 (0.1 ~ 5.0)
-  flushWeight: number;         // 金花权重 (0.1 ~ 4.0)
-  straightWeight: number;      // 顺子权重 (0.1 ~ 3.0)
-  pairWeight: number;          // 对子权重 (0.1 ~ 2.0)
-  highCardWeight: number;      // 散牌权重 (0.1 ~ 2.0)
-  clashRate: number;           // 强强碰撞率 (0 ~ 100%)
-  special235Boost: number;     // 特殊235逆袭杀豹子加权 (0.1 ~ 5.0)
-  playerLuckWeights: Record<number, number>; // 用户ID -> 幸运加权 (-50 ~ +50)
-}
-
-const DEFAULT_ALGORITHM_CONFIG: AlgorithmConfig = {
-  mode: 'fair',
-  leopardWeight: 1.0,
-  straightFlushWeight: 1.0,
-  flushWeight: 1.0,
-  straightWeight: 1.0,
-  pairWeight: 1.0,
-  highCardWeight: 1.0,
-  clashRate: 25,
-  special235Boost: 1.0,
-  playerLuckWeights: {},
-};
-
 const INITIAL_USERS: AdminUser[] = [
   { id: 999, username: 'admin', nickname: '系统超级管理', avatar: '🛡️', balance: 9999999, role: 'admin', isOnline: true, isBanned: false, currentRoomId: null, createdAt: '2026-10-01 10:00:00' },
   { id: 1, username: 'zhangsan', nickname: '绝世赌神张三', avatar: '👑', balance: 10000, role: 'player', isOnline: true, isBanned: false, currentRoomId: '8888', createdAt: '2026-10-10 12:30:00' },
@@ -99,7 +68,7 @@ const INITIAL_CHIP_LOGS: ChipAuditLog[] = [
 const AVATAR_OPTIONS = ['👑', '🦁', '🦊', '🐯', '🐼', '🦅', '🐉', '👤', '🎩', '💎', '🚀', '🔥'];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const { user: currentAdmin } = useAuthStore();
+  const { user: currentAdmin, token } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'accounts' | 'chips' | 'algorithm'>('accounts');
 
   // --- 账号系统状态 ---
@@ -152,27 +121,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [rechargeReason, setRechargeReason] = useState('老友微信转账充值');
   const [chipLogSearch, setChipLogSearch] = useState('');
 
-  // --- 算法系统状态 ---
-  const [algoConfig, setAlgoConfig] = useState<AlgorithmConfig>(() => {
-    const saved = localStorage.getItem('zjh_admin_algo_config');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    return DEFAULT_ALGORITHM_CONFIG;
-  });
-
-  const [simRounds, setSimRounds] = useState<number>(1000);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simResults, setSimResults] = useState<{
-    totalRounds: number;
-    leopard: { count: number; pct: number };
-    straightFlush: { count: number; pct: number };
-    flush: { count: number; pct: number };
-    straight: { count: number; pct: number };
-    pair: { count: number; pct: number };
-    highCard: { count: number; pct: number };
-  } | null>(null);
-
   // 通知提示
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'warn' } | null>(null);
 
@@ -189,10 +137,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   useEffect(() => {
     localStorage.setItem('zjh_admin_chip_logs', JSON.stringify(chipLogs));
   }, [chipLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('zjh_admin_algo_config', JSON.stringify(algoConfig));
-  }, [algoConfig]);
 
   // 账号过滤
   const filteredUsers = useMemo(() => {
@@ -385,64 +329,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
     setShowQuickRechargeModal(false);
     showToast(`🪙 筹码变动生效！${target.nickname} 当前余额: ${newBalance.toLocaleString()}`);
-  };
-
-  // ================= 发牌算法业务逻辑 =================
-  const handleSaveAlgorithmConfig = async () => {
-    try {
-      await api.adminSaveAlgorithmConfig(algoConfig);
-    } catch {
-      // 容错
-    }
-    showToast('⚙️ 发牌算法调控参数已成功保存并立即应用于牌桌！');
-  };
-
-  const handleResetAlgorithmConfig = () => {
-    setAlgoConfig(DEFAULT_ALGORITHM_CONFIG);
-    showToast('🔄 已恢复为官方自然概率平衡模式！');
-  };
-
-  const handleRunSimulation = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      // 基于当前权重系数进行蒙特卡洛仿真模拟
-      const total = simRounds;
-      // 理论自然概率：散牌 74.39%, 对子 16.94%, 顺子 3.26%, 金花 4.96%, 顺金 0.22%, 豹子 0.24%
-      const baseLeopard = 0.24 * algoConfig.leopardWeight;
-      const baseSF = 0.22 * algoConfig.straightFlushWeight;
-      const baseFlush = 4.96 * algoConfig.flushWeight;
-      const baseStraight = 3.26 * algoConfig.straightWeight;
-      const basePair = 16.94 * algoConfig.pairWeight;
-      const baseHigh = 74.39 * algoConfig.highCardWeight;
-
-      const totalWeight = baseLeopard + baseSF + baseFlush + baseStraight + basePair + baseHigh;
-
-      const pLeopard = baseLeopard / totalWeight;
-      const pSF = baseSF / totalWeight;
-      const pFlush = baseFlush / totalWeight;
-      const pStraight = baseStraight / totalWeight;
-      const pPair = basePair / totalWeight;
-      const pHigh = baseHigh / totalWeight;
-
-      const cLeopard = Math.round(total * pLeopard);
-      const cSF = Math.round(total * pSF);
-      const cFlush = Math.round(total * pFlush);
-      const cStraight = Math.round(total * pStraight);
-      const cPair = Math.round(total * pPair);
-      const cHigh = total - (cLeopard + cSF + cFlush + cStraight + cPair);
-
-      setSimResults({
-        totalRounds: total,
-        leopard: { count: cLeopard, pct: Number(((cLeopard / total) * 100).toFixed(2)) },
-        straightFlush: { count: cSF, pct: Number(((cSF / total) * 100).toFixed(2)) },
-        flush: { count: cFlush, pct: Number(((cFlush / total) * 100).toFixed(2)) },
-        straight: { count: cStraight, pct: Number(((cStraight / total) * 100).toFixed(2)) },
-        pair: { count: cPair, pct: Number(((cPair / total) * 100).toFixed(2)) },
-        highCard: { count: cHigh, pct: Number(((cHigh / total) * 100).toFixed(2)) },
-      });
-      setIsSimulating(false);
-      showToast(`🎯 算法模拟完成！已对 ${total.toLocaleString()} 局真实发牌进行测算评估`);
-    }, 400);
   };
 
   return (
@@ -1012,380 +898,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           )}
 
           {/* ======================= 系统 3: 发牌算法调控系统 ======================= */}
-          {activeTab === 'algorithm' && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              {/* 模式选择预设卡片 */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-                  <div>
-                    <h3 className="text-base font-black text-slate-100 flex items-center gap-2">
-                      <Sliders className="w-5 h-5 text-amber-400" />
-                      <span>发牌风控与概率核心模式</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      系统默认基于 52 张真随机洗牌。可根据运营需求快速选用激战预设或深度自定义调节。
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleResetAlgorithmConfig}
-                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition flex items-center gap-1.5"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>恢复官方默认平衡</span>
-                    </button>
-                    <button
-                      onClick={handleSaveAlgorithmConfig}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>保存并应用生效</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 预设模式快捷选框 */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 mt-5">
-                  {[
-                    {
-                      id: 'fair',
-                      title: '官方绝对公平模式',
-                      desc: '52 张扑克真随机洗牌，数学期望自然概率，适合正规竞技',
-                      badge: '标准自然概率',
-                    },
-                    {
-                      id: 'action_boost',
-                      title: '刺激激战碰撞模式',
-                      desc: '提高金花、顺金与豹子碰面频率，大幅增加弃牌与加注博弈',
-                      badge: '大牌频出 · 筹码池大',
-                    },
-                    {
-                      id: 'beginner_favor',
-                      title: '新人留存护航模式',
-                      desc: '对局自动平衡胜负方落差，避免新手连续拿到极小散牌',
-                      badge: '新手留存保障',
-                    },
-                    {
-                      id: 'custom',
-                      title: '高级深度自定义',
-                      desc: '手动微调每项牌型的生成加权、特殊235以及强强碰撞率',
-                      badge: '自由调节',
-                    },
-                  ].map((modeItem) => (
-                    <div
-                      key={modeItem.id}
-                      onClick={() => {
-                        if (modeItem.id === 'fair') {
-                          setAlgoConfig(DEFAULT_ALGORITHM_CONFIG);
-                        } else if (modeItem.id === 'action_boost') {
-                          setAlgoConfig({
-                            ...algoConfig,
-                            mode: 'action_boost',
-                            leopardWeight: 2.2,
-                            straightFlushWeight: 2.0,
-                            flushWeight: 1.8,
-                            straightWeight: 1.5,
-                            pairWeight: 1.0,
-                            highCardWeight: 0.8,
-                            clashRate: 50,
-                            special235Boost: 2.5,
-                          });
-                        } else if (modeItem.id === 'beginner_favor') {
-                          setAlgoConfig({
-                            ...algoConfig,
-                            mode: 'beginner_favor',
-                            leopardWeight: 1.2,
-                            straightFlushWeight: 1.2,
-                            flushWeight: 1.4,
-                            straightWeight: 1.3,
-                            pairWeight: 1.2,
-                            highCardWeight: 0.9,
-                            clashRate: 30,
-                            special235Boost: 1.2,
-                          });
-                        } else {
-                          setAlgoConfig({ ...algoConfig, mode: 'custom' });
-                        }
-                      }}
-                      className={`p-4 rounded-2xl cursor-pointer border transition-all flex flex-col justify-between ${algoConfig.mode === modeItem.id
-                        ? 'bg-amber-500/10 border-amber-500 text-amber-200 shadow-lg shadow-amber-500/10'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-black text-sm text-slate-100">{modeItem.title}</span>
-                          {algoConfig.mode === modeItem.id && (
-                            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{modeItem.desc}</p>
-                      </div>
-                      <span className="mt-3 text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-bold self-start text-amber-400">
-                        {modeItem.badge}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 牌型出牌权重微调滑块 */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* 各牌型概率权重调整 */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
-                  <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
-                    <Percent className="w-4 h-4 text-amber-400" />
-                    <span>牌型概率生成加权系数 (0.1x ~ 5.0x)</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-400">
-                    大于 1.0 表示在自然概率基础上放大出现几率；小于 1.0 表示压制出现率。
-                  </p>
-
-                  <div className="flex flex-col gap-3.5 mt-2 text-xs">
-                    {/* 豹子 */}
-                    <div>
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-amber-400">豹子权重 (Leopard)</span>
-                        <span className="font-mono text-slate-300">{algoConfig.leopardWeight.toFixed(1)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={5.0}
-                        step={0.1}
-                        value={algoConfig.leopardWeight}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', leopardWeight: Number(e.target.value) })}
-                        className="w-full accent-amber-500 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 顺金 */}
-                    <div>
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-purple-400">顺金 (同花顺) 权重</span>
-                        <span className="font-mono text-slate-300">{algoConfig.straightFlushWeight.toFixed(1)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={5.0}
-                        step={0.1}
-                        value={algoConfig.straightFlushWeight}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightFlushWeight: Number(e.target.value) })}
-                        className="w-full accent-purple-500 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 金花 */}
-                    <div>
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-blue-400">金花 (同花) 权重</span>
-                        <span className="font-mono text-slate-300">{algoConfig.flushWeight.toFixed(1)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={4.0}
-                        step={0.1}
-                        value={algoConfig.flushWeight}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', flushWeight: Number(e.target.value) })}
-                        className="w-full accent-blue-500 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 顺子 */}
-                    <div>
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-emerald-400">顺子权重 (Straight)</span>
-                        <span className="font-mono text-slate-300">{algoConfig.straightWeight.toFixed(1)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={3.0}
-                        step={0.1}
-                        value={algoConfig.straightWeight}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', straightWeight: Number(e.target.value) })}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 对子 */}
-                    <div>
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-slate-300">对子权重 (Pair)</span>
-                        <span className="font-mono text-slate-300">{algoConfig.pairWeight.toFixed(1)}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={2.0}
-                        step={0.1}
-                        value={algoConfig.pairWeight}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', pairWeight: Number(e.target.value) })}
-                        className="w-full accent-slate-400 cursor-pointer"
-                      />
-                    </div>
-
-                    {/* 强强碰撞率 */}
-                    <div className="pt-2 border-t border-slate-800">
-                      <div className="flex justify-between font-bold mb-1">
-                        <span className="text-red-400">强强对决碰撞率 (Showdown Clash)</span>
-                        <span className="font-mono text-slate-300">{algoConfig.clashRate}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={algoConfig.clashRate}
-                        onChange={(e) => setAlgoConfig({ ...algoConfig, mode: 'custom', clashRate: Number(e.target.value) })}
-                        className="w-full accent-red-500 cursor-pointer"
-                      />
-                      <span className="text-[10px] text-slate-500">控制多位玩家同局拿到金花及以上大牌火拼的频次</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 蒙特卡洛算法模拟测试机 */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                      <div>
-                        <h4 className="text-sm font-black text-slate-200 flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-emerald-400" />
-                          <span>蒙特卡洛发牌算法仿真验证机</span>
-                        </h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          在上线前预先模拟海量牌局，验证当前概率分布是否合理稳健
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {[1000, 5000].map((rounds) => (
-                          <button
-                            key={rounds}
-                            onClick={() => setSimRounds(rounds)}
-                            className={`px-2 py-1 rounded-lg text-xs font-mono font-bold ${simRounds === rounds ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                              }`}
-                          >
-                            {rounds}局
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-center">
-                      <button
-                        onClick={handleRunSimulation}
-                        disabled={isSimulating}
-                        className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition flex items-center gap-2"
-                      >
-                        <Play className="w-4 h-4 fill-slate-950" />
-                        <span>{isSimulating ? '正在执行模拟发牌计算...' : `立即模拟发牌 ${simRounds.toLocaleString()} 局`}</span>
-                      </button>
-                    </div>
-
-                    {/* 模拟结果数据展示 */}
-                    {simResults && (
-                      <div className="mt-5 flex flex-col gap-2.5 text-xs animate-fade-in">
-                        <div className="text-[11px] font-bold text-slate-400 flex justify-between">
-                          <span>牌型分布测算结果</span>
-                          <span>共 {simResults.totalRounds.toLocaleString()} 局</span>
-                        </div>
-
-                        {/* 豹子 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-amber-400">豹子 (AAA 等)</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.leopard.count} 次 ({simResults.leopard.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-amber-400 h-full" style={{ width: `${Math.min(100, simResults.leopard.pct * 10)}%` }} />
-                          </div>
-                        </div>
-
-                        {/* 顺金 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-purple-400">顺金 (同花顺)</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.straightFlush.count} 次 ({simResults.straightFlush.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-purple-400 h-full" style={{ width: `${Math.min(100, simResults.straightFlush.pct * 10)}%` }} />
-                          </div>
-                        </div>
-
-                        {/* 金花 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-blue-400">金花 (同花)</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.flush.count} 次 ({simResults.flush.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-blue-400 h-full" style={{ width: `${Math.min(100, simResults.flush.pct * 4)}%` }} />
-                          </div>
-                        </div>
-
-                        {/* 顺子 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-emerald-400">顺子</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.straight.count} 次 ({simResults.straight.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-emerald-400 h-full" style={{ width: `${Math.min(100, simResults.straight.pct * 4)}%` }} />
-                          </div>
-                        </div>
-
-                        {/* 对子 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-slate-300">对子</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.pair.count} 次 ({simResults.pair.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-slate-400 h-full" style={{ width: `${Math.min(100, simResults.pair.pct * 2)}%` }} />
-                          </div>
-                        </div>
-
-                        {/* 散牌 */}
-                        <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                          <div className="flex justify-between text-[11px] mb-1 font-bold">
-                            <span className="text-slate-400">单张散牌</span>
-                            <span className="font-mono text-slate-200">
-                              {simResults.highCard.count} 次 ({simResults.highCard.pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-slate-600 h-full" style={{ width: `${Math.min(100, simResults.highCard.pct)}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
-                    <span>
-                      提示：当前发牌算法调控前端已与本地 Mock 引擎全量接通，保存后即刻在客户端本地生效；服务端 API 接入后将无缝直通生产环境。
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeTab === 'algorithm' && <AlgorithmPanel local={!token || token.startsWith('mock_')} />}
         </div>
       </main>
 

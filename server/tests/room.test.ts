@@ -89,12 +89,12 @@ describe('Room State Machine & Game Flow', () => {
     const turnSeat = room.seats[room.findSeatIndexByUserId(currentTurn)]!;
     expect(turnSeat.hasLooked).toBe(true);
 
-    // 看牌后下注必须双倍 (明注：10 * 2 = 20)
+    // 看牌后按正常基准下注 (明注：10 * 1 = 10)
     const initialBalance = turnSeat.user!.balance;
     room.bet(currentTurn, 'call', 10);
 
-    expect(turnSeat.user!.balance).toBe(initialBalance - 20);
-    expect(room.totalPot).toBe(40);
+    expect(turnSeat.user!.balance).toBe(initialBalance - 10);
+    expect(room.totalPot).toBe(30);
   });
 
   it('fold mechanic: when one player folds, the other wins', () => {

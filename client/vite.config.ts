@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    fs: { allow: [path.resolve(__dirname), path.resolve(__dirname, '../server/src/shared')] },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

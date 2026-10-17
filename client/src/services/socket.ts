@@ -45,14 +45,35 @@ class SocketService {
       console.log(`玩家 ${data.nickname} 已看牌`);
     });
 
-    this.socket.on('game:player_bet', (data: { playerId: number; actionType: string; amount: number; chipOption: number }) => {
-      sound.playChip();
-      if (data.actionType === 'allin') {
-        useGameStore.getState().triggerAllInEffect();
-      } else if (data.amount >= 5000) {
-        useGameStore.getState().triggerGoldStreamEffect();
+    this.socket.on(
+      'game:player_bet',
+      (data: {
+        playerId: number;
+        actionType: 'call' | 'raise' | 'allin';
+        amount: number;
+        chipOption: number;
+      }) => {
+        const state = useGameStore.getState();
+        const seat = state.roomState.seats.find((s) => s?.user?.id === data.playerId);
+        if (seat) {
+          state.addFlyingChip(
+            seat.seatIndex,
+            Number(data.chipOption) || data.amount,
+            true,
+            data.amount,
+            data.actionType
+          );
+        } else {
+          sound.playChip();
+        }
+
+        if (data.actionType === 'allin') {
+          state.triggerAllInEffect();
+        } else if (data.amount >= 5000) {
+          state.triggerGoldStreamEffect();
+        }
       }
-    });
+    );
 
     this.socket.on('game:compare_result', (result: CompareResultEvent) => {
       sound.playPKClash();

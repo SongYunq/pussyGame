@@ -5,10 +5,13 @@ export interface CalculatedSeatPosition {
   seatIndex: number;
   seat: TableSeat | null;
   isMe: boolean;
+  angleRad: number; // 座位在椭圆上的极坐标角度 (rad)
   xPercent: number; // 头像位置 X (0 ~ 100%)
   yPercent: number; // 头像位置 Y (0 ~ 100%)
   cardXPercent: number; // 手牌位置 X (0 ~ 100%，靠牌桌中央方向)
   cardYPercent: number; // 手牌位置 Y (0 ~ 100%，靠牌桌中央方向)
+  chipXPercent: number; // 玩家身前筹码堆出现位置 X (0 ~ 100%)
+  chipYPercent: number; // 玩家身前筹码堆出现位置 Y (0 ~ 100%)
   cardAngleDeg: number; // 手牌朝向牌桌中心的旋转角度 (deg)
 }
 
@@ -49,6 +52,12 @@ export function useTableLayout(seats: (TableSeat | null)[], myUserId: number) {
     const otherCardRadiusX = 34;
     const otherCardRadiusY = 28;
 
+    // 玩家身前筹码堆起始位置椭圆长短半轴（位于手牌靠向桌面中心的前方区域）
+    const myChipRadiusX = 22;
+    const myChipRadiusY = 19;
+    const otherChipRadiusX = 27;
+    const otherChipRadiusY = 22;
+
     // 找到自己在在座列表中的排序索引
     const myOrderIndex = seatedList.findIndex((item) => item.seatIndex === mySeatedIndex);
     const baseOffset = myOrderIndex >= 0 ? myOrderIndex : 0;
@@ -70,6 +79,11 @@ export function useTableLayout(seats: (TableSeat | null)[], myUserId: number) {
       const cardX = 50 + currentCardRadiusX * Math.cos(angle);
       const cardY = 50 + currentCardRadiusY * Math.sin(angle);
 
+      const currentChipRadiusX = isMe ? myChipRadiusX : otherChipRadiusX;
+      const currentChipRadiusY = isMe ? myChipRadiusY : otherChipRadiusY;
+      const chipX = 50 + currentChipRadiusX * Math.cos(angle);
+      const chipY = 50 + currentChipRadiusY * Math.sin(angle);
+
       // 计算手牌朝向牌桌中心的旋转角度，并归一化到 [-180, 180] 避免过渡动画绕大圈
       let rawDeg = (angle * 180) / Math.PI - 90;
       while (rawDeg > 180) rawDeg -= 360;
@@ -79,10 +93,13 @@ export function useTableLayout(seats: (TableSeat | null)[], myUserId: number) {
         seatIndex: item.seatIndex,
         seat: item.seat,
         isMe,
+        angleRad: angle,
         xPercent: Math.round(x * 100) / 100,
         yPercent: Math.round(y * 100) / 100,
         cardXPercent: Math.round(cardX * 100) / 100,
         cardYPercent: Math.round(cardY * 100) / 100,
+        chipXPercent: Math.round(chipX * 100) / 100,
+        chipYPercent: Math.round(chipY * 100) / 100,
         cardAngleDeg: Math.round(rawDeg * 100) / 100,
       });
     });

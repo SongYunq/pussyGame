@@ -60,6 +60,14 @@ function initTables(db: DatabaseType) {
 
   // 索引优化
   db.exec(`
+    CREATE TABLE IF NOT EXISTS game_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     CREATE INDEX IF NOT EXISTS idx_ledgers_user_id ON ledgers(user_id);
     CREATE INDEX IF NOT EXISTS idx_ledgers_created_at ON ledgers(created_at);

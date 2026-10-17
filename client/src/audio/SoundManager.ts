@@ -130,6 +130,41 @@ class SoundManager {
   }
 
   /**
+   * 3.5 成摞筹码堆叠与推入音效（加注越多，筹码碰撞层次越丰富）
+   */
+  public playChipStack(chipCount = 8) {
+    if (this.isMuted) return;
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+
+      const clinkSteps = Math.min(6, Math.max(2, Math.floor(chipCount / 5)));
+      for (let i = 0; i < clinkSteps; i++) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        const baseFreq = 1750 + i * 140 + (Math.random() * 60 - 30);
+        const startTime = this.ctx.currentTime + i * 0.038;
+
+        osc.frequency.setValueAtTime(baseFreq, startTime);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.25, startTime + 0.05);
+
+        gain.gain.setValueAtTime(0.15, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.065);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + 0.07);
+      }
+    } catch {
+      // 忽略
+    }
+  }
+
+  /**
    * 4. 比牌 PK 碰撞对决声 (低频轰鸣与重击)
    */
   public playPKClash() {
