@@ -2,6 +2,8 @@
 
 本文档旨在为**前端独立开发、Mock 联调以及后续后端实现**提供标准权威的契约规范。前后端开发严格遵循此协议。
 
+发牌算法的构建规则、实现状态与变更同步要求见 [dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
+
 ---
 
 ## 目录
@@ -350,6 +352,8 @@ interface ApiResponse<T = any> {
 ```
 
 #### 9. 获取当前发牌算法调控配置
+> **实现状态**：第 9～11 项为待实现的服务端接口契约；客户端已有请求方法，但服务端尚未注册对应路由，实际发牌也尚未读取这些配置。下列成功响应与“立即生效”文案属于目标设计，生效时机仍需在 [发牌算法需求文档](dealing_algorithm_requirements.md) 中确定。
+
 * **路径**：`GET /api/admin/algorithm/config`
 * **响应数据**：
 ```json

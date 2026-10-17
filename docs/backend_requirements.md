@@ -2,6 +2,7 @@
 
 > **文档定位与说明**：本文档基于当前后端完整工程源码（[`server/`](file:///Users/prina/Downloads/pussyGame/server/)）进行全面复盘、系统梳理与标准规范化更新。内容涵盖 Node.js + Express + Socket.io + SQLite 架构体系、无作弊防泄密权威裁判引擎、纯内存房间状态机、原子账本经济体系、管理员多维管控中枢、生产单端口静态托管、Docker 容器化部署、自动化测试验证体系，以及针对玩家规则深度研讨的“爆金币赏金击杀流”扩展设计。
 > 相关协议与设计参考：[api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)、[frontend_requirements.md](file:///Users/prina/Downloads/pussyGame/docs/frontend_requirements.md)。
+> 发牌算法规则、自然概率基线及后续变更同步要求统一见：[dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
 
 ---
 
@@ -206,7 +207,8 @@ static changeBalance(
 * **卡牌规格**：标准扑克去除大小王，共 52 张；
   - 4 种花色：黑桃 (`spades`)、红桃 (`hearts`)、梅花 (`clubs`)、方块 (`diamonds`)；
   - 13 种点数：2, 3, 4, 5, 6, 7, 8, 9, 10, 11 (J), 12 (Q), 13 (K), 14 (A)；
-* **洗牌算法**：开局调用 `Deck.shuffle(Deck.createDeck())`，严格遵循 Fisher-Yates 算法，时间复杂度 $O(N)$，确保每个牌序置换概率完全均匀。
+* **洗牌算法**：开局调用 `Deck.shuffle(Deck.createDeck())`，使用 Fisher-Yates 算法，时间复杂度 $O(N)$；在各次随机选择均匀且独立的假设下，每个牌序置换等概率。当前随机来源为 `Math.random()`。
+* **调控接入状态**：当前服务端发牌未读取管理端模式或权重，也未实现算法配置与仿真路由。具体构建规则与待实现范围见 [发牌算法需求文档](dealing_algorithm_requirements.md)。
 
 ### 3.2 牌型判定与权重层级体系
 输入任意 3 张扑克牌，经过点数降序排序后，按以下优先级精准判定牌型（权重从小到大）：
