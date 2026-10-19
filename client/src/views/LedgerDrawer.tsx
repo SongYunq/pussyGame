@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { api } from '../services/api';
 import { LedgerItem } from '../types/game';
 import { X, TrendingUp, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
 
@@ -7,42 +8,22 @@ interface LedgerDrawerProps {
   onClose: () => void;
 }
 
-const MOCK_LEDGERS: LedgerItem[] = [
-  {
-    id: 101,
-    type: 'game_win',
-    amount: 1600,
-    balanceAfter: 11600,
-    description: '第 8888 房间 炸金花胜出独揽奖池',
-    createdAt: '2026-10-13 20:30:00',
-  },
-  {
-    id: 100,
-    type: 'bet',
-    amount: -200,
-    balanceAfter: 10000,
-    description: '第 8888 房间 加注 200',
-    createdAt: '2026-10-13 20:28:15',
-  },
-  {
-    id: 99,
-    type: 'ante',
-    amount: -10,
-    balanceAfter: 10200,
-    description: '第 8888 房间 底注扣除',
-    createdAt: '2026-10-13 20:27:00',
-  },
-  {
-    id: 98,
-    type: 'recharge',
-    amount: 5000,
-    balanceAfter: 10210,
-    description: '管理员线下结算 充值 5,000 筹码',
-    createdAt: '2026-10-13 18:00:00',
-  },
-];
-
 export const LedgerDrawer: React.FC<LedgerDrawerProps> = ({ isOpen, onClose }) => {
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<LedgerItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (!isOpen) setPage(1); }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setLoading(true); setError(''); setItems([]);
+    api.getLedger(page).then(data => { if (active) { setItems(data.list); setTotal(data.total); } })
+      .catch(e => { if (active) setError(e.message || '读取账本失败'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [isOpen, page]);
   if (!isOpen) return null;
 
   return (
@@ -69,7 +50,10 @@ export const LedgerDrawer: React.FC<LedgerDrawerProps> = ({ isOpen, onClose }) =
 
         {/* 流水明细列表 */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {MOCK_LEDGERS.map((item) => {
+          {loading && <p role="status">正在读取账本…</p>}
+          {error && <p role="alert" className="text-rose-300">{error}</p>}
+          {!loading && !error && !items.length && <p className="text-slate-400">暂无流水</p>}
+          {items.map((item) => {
             const isIncome = item.amount > 0;
             return (
               <div
@@ -112,6 +96,11 @@ export const LedgerDrawer: React.FC<LedgerDrawerProps> = ({ isOpen, onClose }) =
           })}
         </div>
 
+        <div className="flex justify-center items-center gap-4 p-2 text-xs">
+          <button disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}>上一页</button>
+          <span>第 {page} 页 · 共 {total} 笔</span>
+          <button disabled={loading || page * 20 >= total} onClick={() => setPage(p => p + 1)}>下一页</button>
+        </div>
         {/* 底部关闭 */}
         <div className="p-4 border-t border-slate-800">
           <button

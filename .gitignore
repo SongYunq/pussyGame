@@ -13,7 +13,9 @@ dist-ssr
 
 # Environment variables
 .env
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
 # Editor & OS files
 .DS_Store
@@ -26,6 +28,9 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
 data/*.db
 server/data/*.db
 !data/.gitkeep
@@ -38,3 +43,23 @@ coverage
 .cache
 .temp
 tmp
+.playwright-cli/
+output/playwright/
+
+# Local tests and development-only helpers
+/server/tests/
+/server/vitest.config.ts
+/client/src/components/dev/
+/client/src/store/mock/
+/client/src/services/algorithmConfig.ts
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local deployment tools, packages and backups
+/deploy/
+/Dockerfile
+/docker-compose*.yml
+/.dockerignore
+/backups/
+/releases/

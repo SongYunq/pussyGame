@@ -84,7 +84,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/30 flex items-center justify-center gap-1.5 transition active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>再来一局</span>
+            <span>{onNextRound ? '再来一局' : '返回牌桌'}</span>
           </button>
         </div>
       </div>

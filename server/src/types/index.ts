@@ -41,6 +41,8 @@ export interface CompareResultEvent {
 export interface RoomState {
   roomId: string;
   roomName: string;
+  playerCount: number;
+  onlinePlayerIds: number[];
   deckKind: DeckKind;
   baseAnte: number;
   turnSeconds: number; // 0 表示思考时间无限制

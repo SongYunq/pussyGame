@@ -1,7 +1,7 @@
 # 炸金花联机游戏 —— 后端架构设计与技术实现规范白皮书 (Backend Architecture & Implementation Specification)
 
-> **文档定位与说明**：本文档基于当前后端完整工程源码（[`server/`](file:///Users/prina/Downloads/pussyGame/server/)）进行全面复盘、系统梳理与标准规范化更新。内容涵盖 Node.js + Express + Socket.io + SQLite 架构体系、无作弊防泄密权威裁判引擎、纯内存房间状态机、原子账本经济体系、管理员多维管控中枢、生产单端口静态托管、Docker 容器化部署及自动化测试验证体系。第九节“爆金币赏金击杀流”仅为创想存档，尚未实现，短期内不计划开发，不属于当前或近期交付范围。
-> 相关协议与设计参考：[api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)、[frontend_requirements.md](file:///Users/prina/Downloads/pussyGame/docs/frontend_requirements.md)。
+> **文档定位与说明**：本文档基于当前后端完整工程源码（[`server/`](../server)）进行全面复盘、系统梳理与标准规范化更新。内容涵盖 Node.js + Express + Socket.io + SQLite 架构体系、无作弊防泄密权威裁判引擎、纯内存房间状态机、原子账本经济体系、管理员多维管控中枢、生产单端口静态托管、生产运行要求及验证边界。第九节“爆金币赏金击杀流”仅为创想存档，尚未实现，短期内不计划开发，不属于当前或近期交付范围。
+> 相关协议与设计参考：[api_specification.md](api_specification.md)、[frontend_requirements.md](frontend_requirements.md)。
 > 最近审查与验证：2026-10-18。静态审查后已按用户要求补写并运行测试：14 个文件、291 项全部通过，双端构建与 6 项生产产物冒烟检查通过。修复、验证范围与上线前未完成项见 [数据库与服务审查记录](database_service_review.md)。
 > 发牌算法规则、自然概率基线及后续变更同步要求统一见：[dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
 
@@ -15,7 +15,7 @@
 5. [WebSocket (Socket.io) 实时网关规范](#五-websocket-socketio-实时网关规范)
 6. [RESTful HTTP API 与管理后台中枢](#六-restful-http-api-与管理后台中枢)
 7. [单端口生产部署与容器化架构](#七-单端口生产部署与容器化架构)
-8. [自动化测试与质量保障体系](#八-自动化测试与质量保障体系)
+8. [验证与仓库边界](#八-验证与仓库边界)
 9. [规则进阶探索与扩展设计：爆金币赏金击杀流 (Bounty Mode)](#九-规则进阶探索与扩展设计爆金币赏金击杀流-bounty-mode)
 
 ---
@@ -64,7 +64,7 @@
 ```
 
 1. **绝对权威防作弊（Zero-Trust Client）**：
-   - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](file:///Users/prina/Downloads/pussyGame/server/src/game/GameReferee.ts) 与 [`Room`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 严格决断；
+   - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](../server/src/game/GameReferee.ts) 与 [`Room`](../server/src/game/Room.ts) 严格决断；
    - 客户端只能上报操作意图（如 `game:look`, `game:bet`, `game:compare`），服务端严密校验合法性；
    - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌，以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
 2. **账户与流水的原子写入（SQLite Transactions）**：
@@ -109,12 +109,6 @@ server/
 │   │   ├── gameEvents.ts       # 牌局动作 (看牌、下注、弃牌、PK比牌)
 │   │   └── chatEvents.ts       # 快捷社交互动 (表情广播、短语广播)
 │   └── index.ts                # Express + Socket.io + 静态托管一体化启动入口
-├── tests/                      # 自动化测试套件
-│   ├── referee.test.ts         # 裁判算法 15 项基准单测
-│   ├── room.test.ts            # 房间状态机流转单测
-│   ├── api.test.ts             # RESTful API 鉴权与流水单测
-│   └── socket_e2e.ts           # 真实双客户端 Socket 对局端到端集成测试
-├── Dockerfile                  # Node 22 Alpine 生产镜像打包
 └── tsconfig.json               # TypeScript 严格编译配置
 ```
 
@@ -122,7 +116,7 @@ server/
 
 ## 二、 数据库设计与原子账本系统 (SQLite + WAL)
 
-数据库持久化文件位于 [`server/data/game.db`](file:///Users/prina/Downloads/pussyGame/server/data/game.db)，服务首次启动时由 [`server/src/db/database.ts`](file:///Users/prina/Downloads/pussyGame/server/src/db/database.ts) 执行 `initTables` 与 `initDefaultAdmin` 自动完成初始化。
+数据库持久化文件位于 ``server/data/game.db``（运行时数据库，不入库），服务首次启动时由 [`server/src/db/database.ts`](../server/src/db/database.ts) 执行 `initTables` 与 `initDefaultAdmin` 自动完成初始化。
 
 ### 2.1 已持久化的实体与约束
 
@@ -186,7 +180,7 @@ server/
 
 - 标准牌 52 张，点数 2～A；短牌 28 张，仅 8～A。无大小王，每人三张，全桌无重复。
 - 标准牌／短牌默认比例 20／80；标准牌随机／冤家／保底为 30／40／30，短牌随机／冤家为 70／30。
-- 先生成完整合法手牌，再在外层数据库事务中扣除全部底注，任一失败则全部回滚；有效人数不足两人不扣款、不开始。
+- 先生成完整合法手牌，再在外层数据库事务中扣除全部底注，任一失败则全部回滚；实际可扣底注人数不等于房间指定人数时不扣款、不开始。
 - 冤家及精确牌型保底先占牌，随机手牌从余牌产生，再随机排列全部手牌组。具体规则见根目录 [dealing_rules.md](../dealing_rules.md)。
 
 ### 3.2 牌型与花色比较
@@ -213,14 +207,14 @@ server/
 
 ## 四、 纯内存房间状态机设计 (Room & RoomManager)
 
-房间全量对局状态机封装在 [`server/src/game/Room.ts`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 中，由 [`server/src/game/RoomManager.ts`](file:///Users/prina/Downloads/pussyGame/server/src/game/RoomManager.ts) 全局管理调度。
+房间全量对局状态机封装在 [`server/src/game/Room.ts`](../server/src/game/Room.ts) 中，由 [`server/src/game/RoomManager.ts`](../server/src/game/RoomManager.ts) 全局管理调度。
 
 ### 4.1 房间生命周期与状态流转
 ```
 ┌────────────────────────────────────────────────────────┐
 │ 1. 等待就绪阶段 (gameStatus: 'waiting')                │
 │    - 玩家加入观战 / 选座入座 (seats[0..7])             │
-│    - 满足条件: 在座人数 ≥ 2 且全部勾选 isReady: true   │
+│    - 满足条件: 达到指定 2～8 人，全员在线且 isReady: true   │
 └──────────────────────────┬─────────────────────────────┘
                            │ 生成合法手牌、原子扣注、私发
                            ▼
@@ -250,11 +244,13 @@ server/
 └────────────────────────────────────────────────────────┘
 ```
 
-房间没有房主字段或房主开始事件。至少两名在座玩家且全员准备时自动开局，管理员角色也不绕过准备条件。创建者仅自动进入观战席；“只有房主能开局”属于尚未采用的另一套产品规则。
+房间没有房主字段或房主开始事件。创建时选择 `playerCount`（2～8，省略默认 2）；达到指定人数、全部在线且全员准备时自动开局，管理员角色也不绕过准备条件。创建者仅自动进入观战席；“只有房主能开局”属于尚未采用的另一套产品规则。
 
-同账号至多归属一个房间，创建或加入另一房间前清理旧房的座位/观战身份及全部连接订阅；局中切房的离座动作按弃牌处理，不能留下两个房间的有效身份。仅最后一个连接断开时移除观战身份；座位继续保留以支持重连。等待中的离线座位目前没有自动过期回收策略。
+同账号至多归属一个房间，创建或加入另一房间前清理旧房的座位/观战身份及全部连接订阅；局中切房的离座动作按弃牌处理，不能留下两个房间的有效身份。仅最后一个连接断开时移除观战身份；座位继续保留以支持重连。等待中的最后连接断开会取消该座位准备并广播离线状态，重连须再次准备；离线座位保留且没有自动过期回收策略。`room:leave` 会按账号移除座位/观战身份，并取消全部标签页订阅、通知 `room:left`；局中退出先弃牌结算。
 
 结算只接受 `playing` 状态，`settling` 时不能继续弃牌触发派奖；房间删除清理定时器且不允许直接删除进行中的房间。空房可回收，4 位房号耗尽明确报错。
+
+房间快照始终发送 `playerCount` 与 `onlinePlayerIds`。在座达到人数上限后拒绝新玩家入座，仍可观战；游戏或结算阶段禁止新入座。正式流程不生成测试玩家，不自动下注，限时房间保留原有超时弃牌。
 
 ### 4.2 8 人桌位模型与桌位状态机 (`TableSeat`)
 每个房间拥有固定的 `seats[8]` 数组（槽位索引 0~7），每个槽位包含如下状态：
@@ -305,7 +301,7 @@ export type PlayerTableStatus =
 * 无限制只取消回合时间限制，不改变手动弃牌、比牌、20 轮强制摊牌或结算后 4 秒重置等规则。
 
 ### 4.7 防作弊全量状态脱敏算法 (`getMaskedState`)
-为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 与 [`Room.broadcastState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts)）：
+为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](../server/src/game/Room.ts) 与 [`Room.broadcastState`](../server/src/game/Room.ts)）：
 ```typescript
 public getMaskedState(forUserId?: number): RoomState {
   const maskedSeats = this.seats.map((seat) => {
@@ -328,11 +324,11 @@ public getMaskedState(forUserId?: number): RoomState {
 
 ## 五、 WebSocket (Socket.io) 实时网关规范
 
-WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/src/socket/`](file:///Users/prina/Downloads/pussyGame/server/src/socket/) 下组织。
+WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/src/socket/`](../server/src/socket) 下组织。
 
 ### 5.1 握手鉴权与房间恢复
-* **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](file:///Users/prina/Downloads/pussyGame/server/src/utils/jwt.ts) 限定 HS256 并校验载荷、有效期和 `authVersion`，查询当前数据库用户身份后绑定至 Socket 实例；验签或凭据版本不符直接拒绝握手，每个入站事件还会再次检查；
-* **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](file:///Users/prina/Downloads/pussyGame/server/src/socket/socketHandler.ts) 检索其历史所在的房间：
+* **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](../server/src/utils/jwt.ts) 限定 HS256 并校验载荷、有效期和 `authVersion`，查询当前数据库用户身份后绑定至 Socket 实例；验签或凭据版本不符直接拒绝握手，每个入站事件还会再次检查；
+* **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](../server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
   2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
 
@@ -363,7 +359,7 @@ HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.a
 
 ## 六、 RESTful HTTP API 与管理后台中枢
 
-RESTful 接口遵循统一规范包裹对象：`{ code, message, data }`。完整细节见 [api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)。
+RESTful 接口遵循统一规范包裹对象：`{ code, message, data }`。完整细节见 [api_specification.md](api_specification.md)。
 
 ### 6.1 接口路由大纲
 ```
@@ -386,7 +382,7 @@ RESTful 接口遵循统一规范包裹对象：`{ code, message, data }`。完�
 ```
 
 ### 6.2 实时在线与所在房间追踪实现
-在 [`AdminController.listUsers`](file:///Users/prina/Downloads/pussyGame/server/src/controllers/adminController.ts) 中，服务端将 SQLite 用户列表与 [`RoomManager.getUserOnlineStatus(userId)`](file:///Users/prina/Downloads/pussyGame/server/src/game/RoomManager.ts) 实时结合，动态透传：
+在 [`AdminController.listUsers`](../server/src/controllers/adminController.ts) 中，服务端将 SQLite 用户列表与 [`RoomManager.getUserOnlineStatus(userId)`](../server/src/game/RoomManager.ts) 实时结合，动态透传：
 * `isOnline`: 当前玩家是否有活跃的 WebSocket 连接；
 * `currentRoomId`: 当前玩家正在哪一个房间中对局或观战。管理员在后台对全服动态一目了然。
 
@@ -395,7 +391,7 @@ RESTful 接口遵循统一规范包裹对象：`{ code, message, data }`。完�
 ## 七、 单端口生产部署与容器化架构
 
 ### 7.1 单端口 Express + WebSocket + 静态资源融合
-在 [`server/src/index.ts`](file:///Users/prina/Downloads/pussyGame/server/src/index.ts) 中：
+在 [`server/src/index.ts`](../server/src/index.ts) 中：
 ```typescript
 if (fs.existsSync(config.clientDistPath)) {
   app.use(express.static(config.clientDistPath));
@@ -406,79 +402,27 @@ if (fs.existsSync(config.clientDistPath)) {
 ```
 * **生产运行流**：前端执行 `npm run build` 生成静态文件至 `client/dist`，启动后端服务时，Express 自动托管静态资源，HTTP 接口、Socket.io 网关与前端页面全部收敛至唯一的 3000 端口（可通过 `PORT` 环境变量自定义）。
 
-### 7.2 Docker 容器化配置
+### 7.2 本机部署配置
 
-[Dockerfile](../Dockerfile) 基于 `node:22-alpine`，使用两端锁文件安装依赖并构建前后端，保持前端引用 `server/src/shared` 的目录关系。运行镜像包含 `server/dist`、生产依赖及 `/app/client/dist`。本轮仅静态核对配方，没有实际构建镜像。
+原生部署脚本、服务配置模板及旧容器部署配置仅在本机维护，不随游戏仓库提交。仓库保留双端依赖清单、锁文件、编译入口和不含真实凭据的环境示例，支持安装依赖、构建和启动。特定服务器的安装、发布及回退由另行保存的部署工具完成。
 
-[.dockerignore](../.dockerignore) 排除宿主机依赖、构建产物、环境变量文件、数据库及其 WAL/SHM 文件，防止复制宿主机原生模块或玩家数据进镜像。
+### 7.3 原生部署（2026-10-18 已发布当前版本）
 
-[docker-compose.yml](../docker-compose.yml) 通过环境注入 `JWT_SECRET` 和 `ADMIN_PASS`，缺失时直接报错；静态目录和数据库路径均为绝对路径。`./server/data:/app/server/data` 是实际采用的目录挂载，保存账户、流水及全局配置。保留数据库不等于恢复中断牌局，见第 2.6 节。
+当前网站沿用 HTTPS/WSS，同域转发到本机游戏服务，正式登录、大厅和真实多人房间已经接通。
 
-## 八、 自动化测试与质量保障体系
+- `HOST` 控制监听地址，默认 `0.0.0.0`；经本机反向代理时显式设置 `HOST=127.0.0.1`，游戏端口不直接暴露公网。
+- 账户、流水和发牌配置保存在独立数据库，凭据通过环境文件提供，均不加入 Git。
+- 构建产物不包含测试、模拟工具或本机部署脚本；服务器需自行安装对应平台的生产依赖。
+- 更新前必须结束牌局并做一致备份；内存中的底池和房间仍不能在进程重启后恢复。
+- 实际部署记录见 [原生部署记录](native_deployment.md)，其中工具仅本机保存。
 
-2026-10-18 已执行统一检查 `npm run test:release`：双端构建成功，14 个测试文件共 291 项全部通过，生产产物冒烟检查 6/6 通过。以下为测试覆盖说明；临时旧库迁移已验证，实际玩家数据库未打开或迁移，Docker 容器镜像尚未构建验证。
+## 八、 验证与仓库边界
 
-### 8.1 裁判引擎全覆盖单测 (`tests/referee.test.ts`)
-* **15/15 项全部通过**：
-  1. 豹子、顺金、金花、顺子、对子、散牌判定；
-  2. A-2-3 最小顺子判定与比点逻辑；
-  3. 特殊 235 逆袭豹子；
-  4. 无豹子时 235 作为普通单张；
-  5. 同点数先比关键牌花色，仍相同时主动方判负；
-  6. 20 轮满轮多人擂台裁决。
+2026-10-18 的正式版本已通过双端构建、15 个测试文件共 305 项回归和 6 项生产产物检查，并使用三个独立浏览器账号验证真实对局。
 
-### 8.2 房间状态机流转单测 (`tests/room.test.ts`)
-* **6/6 项全部通过**：
-  1. 两人准备自动扣除底注并进入 playing 状态；
-  2. 筹码不足 10 倍底注拦截入座；
-  3. 看牌状态切换为明注（下注 1 倍，闷牌下注 0.5 倍）；
-  4. 绝密 PK 比牌、胜负淘汰与奖池累加；
-  5. 仅剩一人存活时自动结算派奖与庄家更替；
-  6. 开局脱敏：除本人外手牌强制为 null；比牌后的查看另按直接胜者权限执行。
+验证覆盖裁判与发牌、满员准备、下注轮换、私密手牌、多窗口与断线重连、身份及权限、数据库事务、原子账本、配置保存与生产启动。测试使用独立内存或临时数据库，不写入实际玩家库；通过验证不代表已实现整局中断恢复或线上充值提现。
 
-* 下注倍率专项测试见 `tests/betting.test.ts`：覆盖底注原额扣除、明牌 1 倍与闷牌 0.5 倍跟注、加注后的跟注、全押基准折算、比牌费用、余额与流水一致性，以及扣款失败时保留原单注基准。
-* 前端金额回归测试见 `tests/frontend-betting.test.ts`：覆盖模拟对局扣款、动作事件金额、比牌弹窗费用、按钮余额门槛与高额下注特效判定。
-* 思考时间测试见 [turn-timer.test.ts](../server/tests/turn-timer.test.ts)：模拟等待 24 小时，验证无限制房间不自动弃牌、开局及轮换没有截止时间、下一局保留设置，且限时超时弃牌与结算重置仍正常执行。
-* [frontend-betting.test.ts](../server/tests/frontend-betting.test.ts) 同时验证大厅创建设置进入模拟控制器并跨开局／操作保持，以及牌桌“无限制”显示。
-* [compare-privacy.test.ts](../server/tests/compare-privacy.test.ts) 验证发起方／被挑战方获胜授权、观战隔离、权限不继承、无效比牌、新局清空及快照副本独立；前端测试覆盖私密牌面、非胜者隐藏、模拟对局和比牌后终局弹窗顺序。
-
-### 8.3 RESTful API 完整鉴权与账本单测 (`tests/api.test.ts`)
-* **12 项测试**：
-  1. 登录成功获取 Token 与错误拦截；
-  2. 凭证受保护接口与管理员鉴权拦截；
-  3. 管理员发号、改密、充扣筹码与原子流水记录；
-  4. 用户个人资料更新与个人账本分页拉取。
-
-### 8.4 新发牌测试与联机验证
-
-`tests/dealing.test.ts` 覆盖五个分支、2～8 人唯一牌、精确保底、全部冤家组合、座位随机、双端裁判一致和真实模拟；`tests/dealing-room.test.ts` 覆盖下一局生效、脱敏、扣款回滚与循环平分流水。
-
-`tests/dealing-socket.test.ts` 自动创建临时本机服务，以两个独立鉴权客户端完成准备、私发保底牌、比牌和派奖广播。`tests/api.test.ts` 增加配置权限、持久化、错误配置拒绝及模拟草稿隔离验证。测试使用独立内存数据库，不写入既有玩家数据。
-
-[dealing-socket.test.ts](../server/tests/dealing-socket.test.ts) 还验证真实 `room:create` 收到 `turnSeconds: 0` 后，创建、开局、下注轮换和断线重连下发的房间状态均保持 `turnSeconds: 0`、`turnDeadline: null`。
-
-该联机套件同时使用四名在局玩家、一名观战者及胜者额外窗口，验证比牌事件和快照的私密牌面隔离、连胜权限不传递、重连恢复及终局战报不泄漏输者手牌。
-
-原 `tests/socket_e2e.ts` 仍是需要外部服务和指定账号的手动联调脚本；自动测试使用新脚本，不依赖该账号或固定端口。
-
-### 8.5 数据库与服务审查回归
-
-| 测试文件 | 项数 | 主要覆盖 |
-| :--- | ---: | :--- |
-| [database-integrity.test.ts](../server/tests/database-integrity.test.ts) | 39 | 旧库迁移与重开、失败初始化回滚、触发器和外键约束、内外层事务回滚、小数金额、经办人与房间归属、流水仅追加及分页 |
-| [auth-validation.test.ts](../server/tests/auth-validation.test.ts) | 84 | 输入边界、账号与权限隔离、令牌生命周期与改密撤销、资金经办人、敏感字段及存储异常脱敏、生产配置安全边界 |
-| [room-regressions.test.ts](../server/tests/room-regressions.test.ts) | 34 | 完整轮次、重复动作与重复派奖、最新钱包、金额范围、底注回滚、房间参数及公开投影 |
-| [socket-regressions.test.ts](../server/tests/socket-regressions.test.ts) | 9 | 全窗口切房、多连接断线、重连、私密手牌、改密主动断连、逐事件鉴权及畸形消息 |
-
-其余原有测试合计 125 项，包括修正完整轮次前提后的 `dealing-room.test.ts`，同时验证底池 `45÷3` 和 `50÷3` 的多人循环克制平分、扣款及流水。新增四个文件共 166 项，合计 291 项，无跳过项。
-
-`npm test` 固定测试凭据与 `DB_PATH=:memory:`；测试配置将 Vite 环境文件目录指向临时空目录，业务配置在 `NODE_ENV=test` 时跳过 `.env`。迁移测试另用自动关闭和删除的系统临时数据库，接口及联机测试监听临时本机端口，不依赖现有服务或玩家账号。
-
-[production-smoke.ts](../server/tests/production-smoke.ts) 由 `npm --prefix server run test:smoke` 执行，要求先构建。它从系统临时工作目录启动真实 `server/dist/index.js`，显式传入随机测试凭据、临时数据库和前端产物路径，检查不安全配置拒绝启动、页面与脚本托管、页面路由回退与 API 404、登录/开号/扣款/经办人审计、日志保密以及重启后的账户/余额/流水保留和不重复初始化；正常完成、失败或收到终止信号时关闭子进程并清理临时数据。
-
-资料更新、资金调整和改密仅将已知业务错误返回 400；未预期存储错误交给统一错误处理返回脱敏 500，不能向客户端回显数据库路径或 SQL 细节。测试通过不改变 [在途资金恢复缺口](#26-尚未实现的在途资金恢复) 及前端尚未接入真实服务的边界。
-
----
+2026-10-19 起，测试源码、测试配置及专用依赖清单仅留本机，仓库不再声明测试命令和专用测试依赖。游戏仓库的正式入口保持 `npm run build` 和 `npm start`；本机维护者使用另行保存的测试入口继续验收。旧验证记录见 [数据库与服务审查记录](database_service_review.md)。
 
 ## 九、 规则进阶探索与扩展设计：爆金币赏金击杀流 (Bounty Mode)
 
@@ -518,3 +462,8 @@ export interface RoomOptions {
 }
 ```
 * 用户后续明确要求启动后，再另行评审规则、资金守恒、账本事务、协议和页面影响；本节不构成开发排期或实现承诺，不应据此提前添加实现或扩展字段。
+
+
+### 2026-10-18 正式流程验证补记
+
+本次变更双端构建、15 个文件共 305 项回归、6 项生产构建检查通过。新增正式认证状态、错误处理、人数校验、满员准备、断线取消准备及多窗口离房测试；已有模拟隐私与金额测试改用独立 `useMockGameStore`。Playwright 使用临时数据库及三个独立浏览器账号验证真实开号、错误密码、登录大厅、指定人数建房、实际入座与观战、满员且全员准备、无自动下注、手动跟注/看牌/弃牌、聊天、结算、下一局重新准备、刷新恢复、真实流水及退出。390 像素窄屏操作栏已验证完整显示。线上发布与公网检查见 [原生部署记录](native_deployment.md)。

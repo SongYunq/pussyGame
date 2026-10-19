@@ -26,6 +26,7 @@ const port = Number(process.env.PORT || '3000');
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须为 1–65535 的整数');
 
 export const config = {
+  host: process.env.HOST || '0.0.0.0',
   port,
   jwtSecret: configuredSecret || randomBytes(32).toString('hex'),
   jwtExpiresIn: 7 * 24 * 60 * 60, // 7 天 (以秒为单位)

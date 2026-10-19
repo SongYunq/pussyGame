@@ -1,5 +1,8 @@
 import type { AlgorithmConfig, SimulationResult } from '../../../server/src/shared/dealing';
 import { UserProfile, LedgerItem } from '../types/game';
+import { useAuthStore } from '../store/useAuthStore';
+export interface AdminUser extends UserProfile { isOnline: boolean; currentRoomId: string | null; createdAt: string }
+export interface AuditRecord extends LedgerItem { userId: number; username: string; nickname: string; operatorUsername: string | null; roomId: string | null }
 
 interface ApiResponse<T = unknown> {
   code: number;
@@ -10,7 +13,7 @@ interface ApiResponse<T = unknown> {
 const BASE_URL = '';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('zjh_token');
+  const token = useAuthStore.getState().token;
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -22,8 +25,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  const resJson: ApiResponse<T> = await response.json();
-  if (resJson.code !== 200) {
+  if (response.status === 401) useAuthStore.getState().logout();
+  let resJson: ApiResponse<T>;
+  try { resJson = await response.json(); } catch { throw new Error('服务器响应异常，请稍后重试'); }
+  if (!response.ok || resJson.code !== 200) {
     throw new Error(resJson.message || '请求失败');
   }
   return resJson.data;
@@ -50,34 +55,20 @@ export const api = {
     request<{ list: LedgerItem[]; total: number }>(`/api/user/ledger?page=${page}&pageSize=${pageSize}`),
 
   // 超级管理员专区
-  adminCreateUser: (data: { username: string; password: string; nickname: string; avatar: string; initialChips: number; role?: 'player' | 'admin' }) =>
+  adminCreateUser: (data: { username: string; password: string; nickname: string; avatar: string; initialChips: number }) =>
     request<{ id: number; username: string; balance: number }>('/api/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  adminDeleteUser: (userId: number) =>
-    request<{ message: string }>(`/api/admin/users/${userId}`, {
-      method: 'DELETE',
-    }),
-
-  adminUpdateUser: (userId: number, data: { nickname?: string; avatar?: string; role?: 'player' | 'admin'; isBanned?: boolean }) =>
-    request<UserProfile>(`/api/admin/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
   adminGetUsers: () =>
-    request<Array<UserProfile & { isOnline: boolean; currentRoomId: string | null; isBanned?: boolean; createdAt: string }>>('/api/admin/users'),
+    request<AdminUser[]>('/api/admin/users'),
 
   adminAdjustChips: (userId: number, amount: number, reason: string) =>
     request<{ userId: number; balance: number }>(`/api/admin/users/${userId}/chips`, {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
     }),
-
-  adminGetChipLogs: (page = 1, pageSize = 50) =>
-    request<{ list: Array<{ id: number; userId: number; username: string; amount: number; balanceAfter: number; reason: string; createdAt: string; operator: string }>; total: number }>(`/api/admin/chips/logs?page=${page}&pageSize=${pageSize}`),
 
   adminResetPassword: (userId: number, newPassword: string) =>
     request<{ message: string }>(`/api/admin/users/${userId}/reset-password`, {
@@ -86,7 +77,7 @@ export const api = {
     }),
 
   adminGetAuditLogs: (page = 1, pageSize = 50) =>
-    request<{ list: unknown[]; total: number }>(`/api/admin/audit-logs?page=${page}&pageSize=${pageSize}`),
+    request<{ list: AuditRecord[]; total: number }>(`/api/admin/audit-logs?page=${page}&pageSize=${pageSize}`),
 
   // 发牌算法调控
   adminGetAlgorithmConfig: () =>

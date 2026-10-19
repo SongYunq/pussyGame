@@ -6,7 +6,7 @@ import { PKClashModal } from '../components/animations/PKClashModal';
 import { AllInEpicEffect } from '../components/animations/AllInEpicEffect';
 import { GoldStreamer } from '../components/animations/GoldStreamer';
 import { SettlementModal } from '../components/animations/SettlementModal';
-import { DevToolBar } from '../components/dev/DevToolBar';
+import { socketService } from '../services/socket';
 import { Volume2, VolumeX, LogOut, FileText } from 'lucide-react';
 
 interface TableViewProps {
@@ -32,7 +32,7 @@ export const TableView: React.FC<TableViewProps> = ({
     flyingChips,
     isMuted,
     toggleMute,
-    dealCards,
+    connectionStatus, actionPending, error,
     lookCards,
     bet,
     fold,
@@ -44,6 +44,10 @@ export const TableView: React.FC<TableViewProps> = ({
     sendPhrase,
   } = useGameStore();
 
+  if (!roomState || !currentUser) return null;
+  const seated = roomState.seats.filter(s => s?.user);
+  const target = roomState.playerCount ?? 2;
+  const unavailable = connectionStatus !== 'connected' || actionPending;
   const mySeat = roomState.seats.find((s) => s?.user?.id === currentUser.id) || null;
   const isMyTurn = roomState.currentTurnPlayerId === currentUser.id && !isGoldStreamTriggered;
 
@@ -55,7 +59,7 @@ export const TableView: React.FC<TableViewProps> = ({
         <div className="flex items-center gap-3">
           {onBackToLobby && (
             <button
-              onClick={onBackToLobby}
+              onClick={() => { if (roomState.gameStatus !== 'playing' || !mySeat || window.confirm('退出房间会放弃本局，确定退出吗？')) onBackToLobby?.(); }}
               className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
               title="返回大厅"
             >
@@ -113,6 +117,8 @@ export const TableView: React.FC<TableViewProps> = ({
         </div>
       </header>
 
+      {(error || connectionStatus !== 'connected') && <p role="alert" className="relative z-40 bg-rose-950 text-rose-200 text-sm px-4 py-2">{connectionStatus !== 'connected' ? '连接已断开，正在重连，请稍候…' : error}</p>}
+      <div className="px-4 py-1 text-xs text-slate-400">已入座 {seated.length} / {target} 人 · 观战 {roomState.spectators.length} 人</div>
       {/* 比牌选择目标提示横条 */}
       {isPKSelecting && (
         <div className="absolute top-14 inset-x-0 z-40 bg-red-600/90 text-white text-xs font-bold py-1.5 px-4 text-center shadow-lg flex items-center justify-center gap-2 animate-bounce">
@@ -139,8 +145,18 @@ export const TableView: React.FC<TableViewProps> = ({
         />
       </main>
 
+      {roomState.gameStatus === 'waiting' && <section className="z-30 p-4 bg-slate-900 border-t border-slate-700 text-center space-y-3">
+        <p className="text-sm text-amber-300">等待满 {target} 人且全员准备 · 已准备 {seated.filter(s => s?.isReady).length} / {target}</p>
+        <div className="flex flex-wrap gap-3 justify-center text-xs">{seated.map(s => <span key={s!.user!.id}>{s!.user!.nickname} · {roomState.onlinePlayerIds && !roomState.onlinePlayerIds.includes(s!.user!.id) ? '离线' : s!.isReady ? '已准备' : '未准备'}</span>)}</div>
+        {roomState.spectators.length > 0 && <p className="text-xs text-slate-400">观战：{roomState.spectators.map(u => u.nickname).join('、')}</p>}
+        <div className="flex gap-3 justify-center">
+          {mySeat ? <><button disabled={unavailable} onClick={() => { void socketService.ready(!mySeat.isReady).catch(() => {}); }} className="px-6 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold">{mySeat.isReady ? '取消准备' : '准备'}</button>
+            <button disabled={unavailable} onClick={() => { void socketService.stand().catch(() => {}); }} className="px-4 py-2 rounded-xl bg-slate-800">离座观战</button></> :
+            <button disabled={unavailable || seated.length >= target} onClick={() => { const index = roomState.seats.findIndex(s => !s?.user); if (index >= 0) void socketService.sit(index).catch(() => {}); }} className="px-6 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold">{seated.length >= target ? '座位已满，正在观战' : '入座参与'}</button>}
+        </div>
+      </section>}
       {/* 底部操作盘 */}
-      <ActionPanel
+      {roomState.gameStatus !== 'waiting' && <fieldset disabled={unavailable} className="contents"><ActionPanel
         mySeat={mySeat}
         isMyTurn={isMyTurn}
         baseAnte={roomState.baseAnte}
@@ -153,8 +169,7 @@ export const TableView: React.FC<TableViewProps> = ({
         onStartPK={() => setPKSelecting(true)}
         onSendEmoji={sendEmoji}
         onSendPhrase={sendPhrase}
-        onStartDeal={dealCards}
-      />
+      /></fieldset>}
 
       {/* 专属特效与弹窗层 */}
       {activePKClash && (
@@ -174,12 +189,10 @@ export const TableView: React.FC<TableViewProps> = ({
           settlementEvent={activeSettlement}
           seats={roomState.seats}
           onClose={closeSettlement}
-          onNextRound={dealCards}
         />
       )}
 
-      {/* 纯前端调试悬浮条 */}
-      <DevToolBar />
+
     </div>
   );
 };

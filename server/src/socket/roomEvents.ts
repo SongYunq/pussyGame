@@ -32,9 +32,9 @@ export function registerRoomEvents(io: Server, socket: Socket): void {
   }
 
   // 1. 创建房间
-  socket.on('room:create', (data: { roomName: string; baseAnte: number; turnSeconds?: number }, callback) => {
+  socket.on('room:create', (data: { roomName: string; baseAnte: number; turnSeconds?: number; playerCount?: number }, callback) => {
     try {
-      const room = RoomManager.createRoom(data.roomName, data.baseAnte, data.turnSeconds, io);
+      const room = RoomManager.createRoom(data.roomName, data.baseAnte, data.turnSeconds, io, data.playerCount);
       try { joinRoom(room); }
       catch (err) { RoomManager.removeEmptyRoom(room.roomId); throw err; }
 
@@ -83,6 +83,28 @@ export function registerRoomEvents(io: Server, socket: Socket): void {
       } else {
         socket.emit('error', { code: 400, message: err.message || '加入房间失败' });
       }
+    }
+  });
+
+  socket.on('room:leave', (_data, callback) => {
+    try {
+      const room = RoomManager.findRoomByUserId(userId);
+      const roomId = room?.roomId ?? null;
+      if (room) {
+        room.stand(userId, false);
+        room.removeSpectator(userId);
+        for (const peer of io.sockets.sockets.values()) {
+          if ((peer as any).userId === userId) {
+            peer.leave(`room:${roomId}`);
+            peer.emit('room:left', { roomId });
+          }
+        }
+        room.broadcastState();
+        RoomManager.removeEmptyRoom(room.roomId);
+      }
+      if (typeof callback === 'function') callback({ code: 200, message: '已退出房间' });
+    } catch (err) {
+      if (typeof callback === 'function') callback({ code: 400, message: err instanceof Error ? err.message : '退出失败' });
     }
   });
 
