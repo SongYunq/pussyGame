@@ -12,6 +12,7 @@ export interface RoomOptions {
   roomName: string;
   baseAnte: number;
   turnSeconds: number;
+  playerCount?: number;
   io?: Server;
 }
 
@@ -20,6 +21,7 @@ export class Room {
   public roomName: string;
   public baseAnte: number;
   public turnSeconds: number;
+  public playerCount: number;
   public gameStatus: 'waiting' | 'playing' | 'settling' = 'waiting';
   public deckKind: DeckKind = 'standard';
   public currentRound: number = 0;
@@ -43,6 +45,10 @@ export class Room {
     this.roomName = options.roomName;
     this.baseAnte = options.baseAnte;
     this.turnSeconds = options.turnSeconds;
+    this.playerCount = options.playerCount ?? 2;
+    if (!Number.isInteger(this.playerCount) || this.playerCount < 2 || this.playerCount > 8) {
+      throw new Error('房间人数必须为 2～8 的整数');
+    }
     this.currentBet = options.baseAnte;
     this.io = options.io;
   }
@@ -77,11 +83,16 @@ export class Room {
    * 玩家入座
    */
   public sit(userId: number, seatIndex: number): void {
+    if (this.gameStatus !== 'waiting') throw new Error('请等待本局结束后入座');
     if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex >= 8) {
       throw new Error('无效的座位号');
     }
     if (this.seats[seatIndex] !== null) {
       throw new Error('该座位已被占用');
+    }
+
+    if (this.findSeatIndexByUserId(userId) === -1 && this.seats.filter(Boolean).length >= this.playerCount) {
+      throw new Error('房间座位已满，可继续观战');
     }
 
     const userRecord = UserModel.findById(userId);
@@ -162,13 +173,14 @@ export class Room {
   }
 
   /**
-   * 检查是否可以自动开局 (在座玩家 >= 2 且全部就绪)
+   * 检查是否可以自动开局 (达到指定人数、全员在线且全部就绪)
    */
   private checkAutoStart(): void {
     const seatedPlayers = this.seats.filter((s): s is TableSeat => s !== null);
     const readyPlayers = seatedPlayers.filter((s) => s.isReady);
 
-    if (seatedPlayers.length >= 2 && readyPlayers.length === seatedPlayers.length) {
+    if (seatedPlayers.length === this.playerCount && readyPlayers.length === this.playerCount &&
+        seatedPlayers.every(seat => !this.io || this.findSocketIdsByUserId(seat.user!.id).length > 0)) {
       this.startGame();
     }
   }
@@ -180,7 +192,8 @@ export class Room {
     if (this.gameStatus !== 'waiting') return;
 
     const readySeats = this.seats.filter((s): s is TableSeat => s !== null && s.isReady);
-    if (readySeats.length < 2) return;
+    if (readySeats.length !== this.playerCount || this.seats.filter(Boolean).length !== this.playerCount ||
+        readySeats.some(seat => this.io && this.findSocketIdsByUserId(seat.user!.id).length === 0)) return;
 
     // 发牌前重新确认实际可参与人数，避免扣款失败后出现单人或空局。
     const activeSeats = readySeats.filter(seat => {
@@ -194,7 +207,7 @@ export class Room {
       }
       return true;
     });
-    if (activeSeats.length < 2) { this.broadcastState(); return; }
+    if (activeSeats.length !== this.playerCount) { this.broadcastState(); return; }
 
     // 先生成完整合法手牌；配置或选牌失败时不扣除任何底注。
     const deal = dealHands(activeSeats.length, AlgorithmModel.getConfig());
@@ -741,6 +754,9 @@ export class Room {
     return {
       roomId: this.roomId,
       roomName: this.roomName,
+      playerCount: this.playerCount,
+      onlinePlayerIds: Array.from(new Set([...this.seats.flatMap(seat => seat?.user ? [seat.user.id] : []), ...this.spectators.keys()]))
+        .filter(id => !this.io || this.findSocketIdsByUserId(id).length > 0),
       deckKind: this.deckKind,
       baseAnte: this.baseAnte,
       turnSeconds: this.turnSeconds,

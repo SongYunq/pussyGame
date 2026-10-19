@@ -1,9 +1,9 @@
 # 炸金花联机网页游戏 —— 前端需求规范与技术实现白皮书
 
-> **文档定位与说明**：本文档基于当前前端工程源码（`client/`）进行全面梳理与标准更新，涵盖架构设计、页面视图流转、第一人称自适应排座算法、3D 卡牌手感、2.5D 拟真筹码堆叠动效、Web Audio 振荡器音频合成引擎、防作弊绝密比牌机制、管理员多维管控中枢及双模驱动（Mock 独立演示 / Socket.io 实时信令）实现规范。
-> 接口契约参考：[api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)；服务端规范参考：[backend_requirements.md](file:///Users/prina/Downloads/pussyGame/docs/backend_requirements.md)。
+> **文档定位与说明**：本文档基于当前前端工程源码（`client/`）进行全面梳理与标准更新，涵盖架构设计、页面视图流转、第一人称自适应排座算法、3D 卡牌手感、2.5D 拟真筹码堆叠动效、Web Audio 振荡器音频合成引擎、防作弊绝密比牌机制、管理员多维管控中枢及正式实时通信与独立模拟测试的边界规范。
+> 接口契约参考：[api_specification.md](api_specification.md)；服务端规范参考：[backend_requirements.md](backend_requirements.md)。
 > 发牌算法规则、实际接入状态与变更同步要求统一见：[dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
-> **2026-10-18 验证**：双端构建、14 个文件共 291 项测试及 6 项生产产物冒烟检查通过，包含前端金额/隐私逻辑和真实页面静态托管；未进行浏览器全流程验收，管理页与流水抽屉的模拟数据边界仍然存在。详情见 [数据库与服务审查记录](database_service_review.md)。资料、资金和改密接口的未预期存储错误返回脱敏 500，前端只有收到业务成功后才能展示操作成功。
+> **2026-10-18 正式流程更新**：正式入口已接入真实认证、房间、手动对局、账号管理及分页流水；模拟状态仅保留在独立回归测试模块。验证结果见 [原生部署记录](native_deployment.md)。
 > **范围约束**：[爆金币赏金击杀流](backend_requirements.md#九-规则进阶探索与扩展设计爆金币赏金击杀流-bounty-mode) 尚未实现，仅作创想存档，不在近期开发或验收范围；用户后续明确要求启动前，不得据此增加页面、接口、模式参数或相关实现。
 
 ---
@@ -20,6 +20,7 @@
 * **音频合成**：HTML5 Web Audio API（代码级纯振荡器合成，零 MP3 静态文件依赖，零延迟）。
 
 ### 1.2 全端响应式与移动端专属优化
+* **移动操作区**：窄屏下注按钮用三列换行，轮次及注额保持完整单行；不允许横向裁掉全押或跟注按钮。
 * **防缩放与手势冲突**：`index.html` 严格限制 `viewport-fit=cover, user-scalable=no, maximum-scale=1.0`。
 * **刘海屏与安全区**：注入 CSS 安全区环境变量 `--sat`, `--sar`, `--sab`, `--sal`（`env(safe-area-inset-*)`）。
 * **防橡皮筋与原生选区屏蔽**：全局锁定 `touch-action: manipulation`，全桌视图统一开启 `select-none` 杜绝误触长按弹出文字选择条。
@@ -28,28 +29,28 @@
 
 ## 二、 页面视图架构与路由流转
 
-系统采用基于角色的多视图状态切换流转（由 [App.tsx](file:///Users/prina/Downloads/pussyGame/client/src/App.tsx) 统一分发）：
+系统采用基于角色的多视图状态切换流转（由 [App.tsx](../client/src/App.tsx) 统一分发）：
 
 ```
 App 视图流转体系
 ├── 1. 登录视图 (LoginView)
 │    ├── 账号密码校验登录（无公开外链注册，仅限管理员内部分配）
-│    ├── 快速填入体验账号（admin 管理员 / zhangsan 玩家）
-│    └── 离线与断网自动降级快速通道
+│    ├── 不预填账号；失败留在登录页并显示服务端错误
+│    └── 保存的令牌须经 /api/auth/me 验证，忽略旧模拟身份和缓存角色
 ├── 2. 游戏大厅视图 (LobbyView)
 │    ├── 个人资料与钱包筹码即时展示
 │    ├── 快捷房间号检索加入（4~6位房间号）
-│    ├── 自定义开辟房间（房间名、底注 10/20/50/100、思考时间 15/20/30/60s 或无限制）
+│    ├── 自定义开辟房间（2～8 人、房间名、底注 10/20/50/100、思考时间 15/20/30/60s 或无限制）
 │    └── 牌型权重与特殊 235 裁判规则图解弹窗
 ├── 3. 游戏桌面核心视图 (TableView)
 │    ├── 顶部信息栏（房号、底注、思考时间、静音切换、账本入口、个人筹码）
 │    ├── 牌桌主体椭圆画布（内嵌毛呢桌布纹理、中央底池全息金字、自适应桌位）
 │    ├── 底部交互面板 (ActionPanel)：看牌、弃牌、比牌、跟注、加注抽屉、梭哈、表情/短语
 │    ├── 专属动效与特写层：PK 绝密对决弹窗、All-in 屏幕雷电震颤、5000+ 金光流幅、终局结算卡片
-│    └── 左下角纯前端 Mock 调测驱动台 (DevToolBar)
+│    └── 入座／离座／准备：达到指定人数且全员在线、准备才开局；每局重新准备
 ├── 4. 管理员后台 (AdminDashboard)
 │    ├── 角色权限物理隔离（管理员账号登录强制锁定管理端，隔离牌桌）
-│    ├── 账号管理子系统：检索、多状态筛选、开通新账号、重置密码、修改资料/封禁、安全删除
+│    ├── 账号管理子系统：读取真实列表、开通玩家账号、重置密码
 │    ├── 充值与资金子系统：快速充减筹码、流水明细溯源、全流通筹码统计
 │    └── 发牌算法调控子系统：双牌库比例、互斥模式、按人数精确保底、真实发牌模拟
 └── 5. 个人战绩流水抽屉 (LedgerDrawer)
@@ -62,14 +63,14 @@ App 视图流转体系
 
 * 创建弹窗使用“每轮思考时间”，提供 `15s / 20s / 30s / 60s / 无限制` 五个选项，默认保持 `20s`；无限制用数值 `0` 表达。
 * 选择无限制时提示“不设倒计时，不会因超时自动弃牌”；牌桌顶部显示“思考: 无限制”，不显示 `0s`。
-* 已实现的大厅创建流程由本地模拟控制器创建并保存完整房间设置；开局、看牌、下注和轮换不会恢复旧的思考时间。模拟状态在无限制下始终使用 `turnDeadline: null`，机器人仍按原有节奏主动操作。
-* 联机服务端的 `room:create` 与房间状态广播支持同一 `0 / null` 契约；客户端已有 `SocketService` 信令方法。当前 `LobbyView` 及牌桌动作仍使用本地模拟流程，完整联机页面接入属于待实现，不能将本地创建描述为已经完成多人联机。
+* 大厅经 `room:create` 创建真实房间，发送名称、底注、思考时间及 `playerCount`；房号由服务端分配，只有收到 `room:state` 才进入牌桌，不存在默认房间。创建/加入后先观战，点击“入座参与”后显示在牌桌上。
+* 选择开局人数 2～8 人（创建弹窗默认 4）；仅真实在座者参与，满额、全员在线且准备后由服务端发牌。页面展示实际入座、观战、准备及离线状态。正式链路没有机器人、自动下注、手动强制开局或调试浮条；限时房间仍保留服务端超时弃牌，无限制房间不自动行动。
 
 ## 三、 牌桌核心交互与视觉动效规范
 
 ### 3.1 动态 8 人自适应桌位算法 (第一人称视角居中)
 * **核心规范**：不论玩家实际坐于哪一个物理座位，在自己的客户端屏幕上永远处于椭圆牌桌的正下方底部正中（相对旋转归零）。其余 1~7 位在座玩家依照顺时针顺序均匀环形分布在牌桌上方及左右两侧。
-* **数学计算模型**（见 [useTableLayout.ts](file:///Users/prina/Downloads/pussyGame/client/src/hooks/useTableLayout.ts)）：
+* **数学计算模型**（见 [useTableLayout.ts](../client/src/hooks/useTableLayout.ts)）：
   设在座有效人数为 $N$（$2 \le N \le 8$），当前客户端玩家在在座列表中的相对基准偏移为 $baseOffset$。
   对于任意在座玩家序号 $index$：
   $$\text{relativeOrder} = (index - baseOffset + N) \pmod N$$
@@ -80,7 +81,7 @@ App 视图流转体系
   * **手牌向心朝向角度**：$Deg = \theta \times \frac{180^\circ}{\pi} - 90^\circ$，并通过周期变换归一化至 $[-180^\circ, 180^\circ]$，保证扑克顶部始终平滑朝向牌桌中央，且席位变动时角度过渡无突兀反转。
 
 ### 3.2 3D 拟真翻牌手感 (GPU 硬件加速)
-* **组件实现**：[Card3D.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/Card3D.tsx)。
+* **组件实现**：[Card3D.tsx](../client/src/components/table/Card3D.tsx)。
 * **未看牌状态（暗注）**：
   * 采用双面 `preserve-3d` 与 `backface-visibility: hidden` 构造立体纸牌；
   * 背面采用深蓝暗金渐变并带双层微细虚线框与黑桃金底纹印花；
@@ -92,7 +93,7 @@ App 视图流转体系
   * 自身手牌翻开后，右侧自动弹出由本地裁判引擎识别并高亮渲染的牌型胶囊（如：“豹子 AAA”、“金花 K最大”、“顺金”）。
 
 ### 3.3 2.5D 真实筹码堆叠与阵地阵型系统
-* **组件实现**：[FlyingChipStack.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/FlyingChipStack.tsx) 与 [PokerTable.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/PokerTable.tsx)。
+* **组件实现**：[FlyingChipStack.tsx](../client/src/components/table/FlyingChipStack.tsx) 与 [PokerTable.tsx](../client/src/components/table/PokerTable.tsx)。
 * **下注筹码高度分级模型**：
   依据每次下注/加注的实际筹码金额，自动生成分层筹码柱：
   * $\le 10$ 筹码：4 层；
@@ -113,18 +114,18 @@ App 视图流转体系
   * **性能与防爆炸熔断**：单人面前最多保留 15 摞筹码或累计 60,000 筹码，全桌上限 75 摞或 250,000 底池，超出阈值平滑转为静默数字累加。
 
 ### 3.4 专属震撼高潮特效
-1. **首次 5000+ 全屏大金盛典与女声播报 ([GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx))**：
+1. **首次 5000+ 全屏大金盛典与女声播报 ([GoldStreamer.tsx](../client/src/components/animations/GoldStreamer.tsx))**：
    * **触发条件**：每局牌中，当**首次**出现单次实际押注金额 $\ge 5000$（5000 或 5000+）时全桌同步触发（同一局后续 5000+ 押注不再重复触发全屏阻断）；
    * **全屏占满与全桌操作锁定**：以 `fixed inset-0 z-[100] pointer-events-auto` 占满整个屏幕并拦截所有点击/触摸交互，同时锁定底部操作面板与 AI 出牌回合，持续 4.2 秒，期间所有人无法操作；
    * **皇家大金盛典视觉与动态金额**：全屏黑金毛玻璃底幕配合居中旋转的皇家太阳金芒射线、漫天鎏金星尘粒子与 3D 浮雕“恭喜大金”主舞台，画面动态展示**玩家昵称**与**实际押注金额**（`首次下注 {amount} 码`，严格与实际押注金额相符）；
-   * **预录制真人感女声播报**：同步调用 [`SoundManager.playFirstGoldAnnouncement()`](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts#L293)，先奏响皇家庆典和弦，随后播放预录制的高品质中文女声 MP3 音频文件 [`/audio/first_gold.mp3`](file:///Users/prina/Downloads/pussyGame/client/public/audio/first_gold.mp3)（*“恭喜大金！豪气冲天，一掷千金，全场瞩目！”*）。
-2. **All-in 边缘流光与顶部战报特效 ([AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx))**：
+   * **预录制真人感女声播报**：同步调用 [`SoundManager.playFirstGoldAnnouncement()`](../client/src/audio/SoundManager.ts#L293)，先奏响皇家庆典和弦，随后播放预录制的高品质中文女声 MP3 音频文件 [`/audio/first_gold.mp3`](../client/public/audio/first_gold.mp3)（*“恭喜大金！豪气冲天，一掷千金，全场瞩目！”*）。
+2. **All-in 边缘流光与顶部战报特效 ([AllInEpicEffect.tsx](../client/src/components/animations/AllInEpicEffect.tsx))**：
    * 玩家点击“全押”或收到全押广播时触发，持续 2.0 秒平滑进退场；
    * **零遮挡中央视野**：屏幕中央 64% 区域保持完全通透，不放置任何遮挡牌桌、底池或筹码柱的中央弹窗；
    * **四周电影感赤金暗角与火星粒子**：屏幕外圈柔和赤红暗角脉冲（`animate-allin-vignette`）、上下边缘能量锋线，以及左右两侧外沿升腾的赤金火星粒子（`animate-allin-ember`）；
    * **顶部悬浮流光战报横幅**：在顶部状态栏下方弹出黑金赤焰胶囊战报（`animate-allin-banner`），表面伴随高光扫掠（`animate-allin-sheen`），动态展示 `ALL IN` 金属字样、全押玩家昵称及全押金额；
-   * **牌桌本体震动与桌沿流光**：联动 [PokerTable.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/PokerTable.tsx) 触发牌桌本体冲击震颤（`allin-shake`）与桌沿金红脉冲光晕，音频引擎同步播放双脉冲深沉心跳重低音（`playAllIn()`）。
-3. **绝密比牌决斗 (PK 碰撞对决 [PKClashModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/PKClashModal.tsx))**：
+   * **牌桌本体震动与桌沿流光**：联动 [PokerTable.tsx](../client/src/components/table/PokerTable.tsx) 触发牌桌本体冲击震颤（`allin-shake`）与桌沿金红脉冲光晕，音频引擎同步播放双脉冲深沉心跳重低音（`playAllIn()`）。
+3. **绝密比牌决斗 (PK 碰撞对决 [PKClashModal.tsx](../client/src/components/animations/PKClashModal.tsx))**：
    * **发起流程**：第 2 轮及之后开放比牌；点击“比牌”按钮，牌桌所有存活对手头像亮起红色呼吸光圈并浮现“点击对决”靶心；
    * **消耗倍率**：扣除自身一次跟注金额的 2 倍，即闷牌扣除单注基准的 1 倍、明牌扣除 2 倍；
    * **1v1 暗封撞击舞台**：
@@ -135,7 +136,7 @@ App 视图流转体系
      * 胜者的弹窗保留 6 秒，可点击“返回牌桌”收起；其他视角保持 2.8 秒。终局战报等待比牌弹窗关闭后再显示，避免覆盖私密手牌。
      * 输家状态即刻置为 `lost`；胜者视角的牌桌保留输者正面牌，其余视角仍为暗牌。牌桌不附加“仅你可见”等小字，提示仅在比牌弹窗展示。展示不依赖输者是否看牌，也不会替胜者查看自己的手牌。
      * 服务端按本局直接胜负记录授予权限，重连后快照恢复；权限不因后续胜负继承，重置或新局清空。模拟控制器仅在本地玩家获胜时提供对应输者牌面；新局重新隐藏其他人手牌。
-4. **终局胜出结算卡片 ([SettlementModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/SettlementModal.tsx))**：
+4. **终局胜出结算卡片 ([SettlementModal.tsx](../client/src/components/animations/SettlementModal.tsx))**：
    * 对局决出胜者时（其余全员弃牌/战败，或达到 20 轮上限亮牌），触发全屏纸屑礼花飞舞；
    * 弹出终局大捷金色奖杯卡片，展示赢家头像、独揽筹码数值（如 `+12,800 筹码`）；
    * 按获奖玩家编号展示各自手牌、牌型和派奖金额；循环克制时展示平分奖池；
@@ -145,7 +146,7 @@ App 视图流转体系
 
 ## 四、 拟真音效与语音系统 (Web Audio API + 预录制语音)
 
-位于 [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts)，结合 Web Audio API 实时合成与预录制真人感女声播报：
+位于 [SoundManager.ts](../client/src/audio/SoundManager.ts)，结合 Web Audio API 实时合成与预录制真人感女声播报：
 
 | 音效方法 | 物理拟真声学原理 | 触发时机 |
 | :--- | :--- | :--- |
@@ -176,7 +177,7 @@ App 视图流转体系
 
 ## 六、 社交互动体系规范
 
-位于 [ActionPanel.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/ActionPanel.tsx)：
+位于 [ActionPanel.tsx](../client/src/components/table/ActionPanel.tsx)：
 * **快捷表情浮空弹窗**：支持 8 种高频互动 Emoji（🔥 烈火、😎 墨镜帅、😭 痛哭、💀 绝望骷髅、💰 金币眼、👍 点赞、🚀 起飞、🍺 干杯）；
   * 发送后在对应玩家头像正上方生成 2.5 秒浮动放大、平滑淡出的动画气泡（`animate-float-up`）。
 * **快捷短语对话框**：预设 5 条经典金句（“快点吧，我等到花儿都谢了！”、“梭哈是一种智慧！”、“风水轮流转，底裤全靠这把！”、“老铁，稳住别慌！”、“搏一搏，单车变摩托！”）；
@@ -186,16 +187,16 @@ App 视图流转体系
 
 ## 七、 超级管理员中枢平台规范 (AdminDashboard)
 
-位于 [AdminDashboard.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/AdminDashboard.tsx)，为独立于游戏桌的深度运维平台：
+位于 [AdminDashboard.tsx](../client/src/views/AdminDashboard.tsx)，为独立于游戏桌的深度运维平台：
 
 ### 7.1 账号管理系统 (Accounts)
-* **页面能力与真实链路**：页面提供开号、资料编辑、角色选择、改密、封禁和删除等控件，但用户列表仍由本地数据初始化，若干写操作在请求失败后仍更新本地状态。这些界面表现不能证明服务端已保存。后端已提供普通玩家开号、本人资料修改、管理员改密；管理员编辑他人资料/角色、封禁和删除账号均待实现。
-* **统计边界**：当前后台统计基于页面本地用户列表，不能视为服务端真实全量统计；后端列表虽提供在线状态和所在房号，页面列表的完整读取接入仍待实现。
-* **搜索与多态筛选**：支持按用户名/昵称模糊检索，支持全量、在线、离线、已封禁四态快速过滤。
+* 已实现：从真实管理员接口读取用户及在线/所在房间状态；创建普通玩家账号、重置密码。列表可手动刷新。创建成功后重新读取服务端数据，失败显示错误并保留表单。
+* 管理员编辑他人资料/角色、封禁和删除账号的服务端接口仍待实现，正式页面不展示这些无效操作。管理员登录进入管理页，普通玩家进入大厅。
 
-### 7.2 充值与资金系统 (Chips)
-* **双向充减控件**：服务端已提供管理员原子充减接口并记录真实经办人；页面仍有请求失败后本地修改并显示成功的路径，待修复联机错误处理。原因在页面要求填写，服务端允许省略并生成默认描述。这里记录线下结算，不代表已经接入线上充值或提现。
-* **流水展示边界**：后台充值专账接口尚未实现；个人流水抽屉仍展示固定模拟数据。真实个人流水接口及管理员全局流水接口已经存在，完整页面读取接入待实现。全局接口新增结构化经办人和房间编号；旧数据未知值为 `null`。应用端流水只允许追加，不能称为不可篡改存证。
+### 7.2 筹码与流水系统 (Chips)
+* 调整筹码必须填写原因，正数增加、负数扣除；只有服务端成功后显示成功并刷新列表和流水。请求失败不修改本地余额，也不自动重试资金请求。
+* 个人抽屉读取 `/api/user/ledger`（每页 20 笔），管理员全站流水读取 `/api/admin/audit-logs`（每页 20 笔）；包含加载、空数据、错误及分页状态，移除固定测试流水。
+* 账本记录实际收支及经办人；这里记录管理员线下充扣，尚未接入线上充值或提现。
 
 ### 7.3 发牌规则配置与真实模拟
 
@@ -205,7 +206,7 @@ App 视图流转体系
 - 冤家组合默认 35／35／20／10，按实际规则产生两手强牌。
 - 对 2～8 人分别设置对子、顺子、金花、顺金、豹子的指定人数；各人数默认两手对子，其余为零，剩余人数自动随机。
 - 牌型精确生成，没有“及以上”；零不禁止自然出现。人数溢出或概率和错误会禁止保存和模拟。
-- 联机凭据通过管理员接口保存；演示凭据只保存本地演示配置。页面显示当前作用范围，保存失败明确报错，成功提示从下一局生效。
+- 配置由管理员接口读取和保存；保存失败明确报错，成功提示从下一局生效。正式页面不提供本地演示保存路径。
 - 草稿与已保存配置分离，恢复默认需再保存；读取失败时不能以默认草稿覆盖联机配置。
 - 支持按 2～8 人执行 1,000 或 5,000 局真实发牌模拟。分支按局、牌型按手统计，特殊 235 单列；模拟不保存草稿、不影响余额。
 
@@ -215,23 +216,19 @@ App 视图流转体系
 
 ## 八、 运行模式与调测驱动体系
 
-系统设计为**双模驱动**架构：
+正式应用只启用真实联机；独立模拟模块用于回归验证，不由正式 App 导入或挂载。
 
-### 8.1 纯前端 Mock 独立驱动模式 ([mockGameService.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/mock/mockGameService.ts))
-* **脱机独立运行**：在无任何 Node.js 服务端启动的环境下，前端状态机完全闭环；
-* **内置机器人 AI 调度器**：
-  * 开局读取已保存演示配置，调用共用发牌函数选择牌库及模式并分配暗牌；
-  * 自动模拟真实对手轮流出牌（30% 概率看牌、35% 概率加注，其余跟注，1.15 秒拟人化延迟）；
-  * 真实比牌牌型裁决、弃牌判定、独揽结算与余额更新。
-* **底部悬浮调测工具台 ([DevToolBar.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/dev/DevToolBar.tsx))**：
-  * 提供快捷测试功能：`[一键发牌]`、`[翻开看牌]`、`[小注 +20]`、`[中注 +100]`、`[高摞 +1000]`、`[对手加注 +500]`、`[5000+ 超高筹码]`、`[All-in 满柱]`、`[比牌 PK 模拟]`、`[终局结算战报]`；
-  * **2~8 人动态切换器**：点击 2人 ~ 8人 按钮，一键验证任意人数下的椭圆自适应桌位数学重排过渡。
+### 8.1 仓库与本机辅助工具边界（2026-10-19）
 
-### 8.2 生产联机 WebSocket 网关模式 ([socket.ts](file:///Users/prina/Downloads/pussyGame/client/src/services/socket.ts))
+仓库只维护正式游戏页面及其业务依赖。测试、模拟状态、调试工具栏和演示配置仅保留在本机，由忽略规则排除；前端编译同时排除这些文件。正式管理页面只通过管理员接口读写配置和执行真实发牌模拟，不再依赖本机演示配置。管理员的发牌模拟属于已实现的业务能力，继续保留。
+
+### 8.2 生产联机 WebSocket 网关模式 ([socket.ts](../client/src/services/socket.ts))
+> **2026-10-18 正式流程核对**：`App` 验证真实登录后连接 `socketService`；状态仓库初始身份、房间均为空。清除旧 `mock_*` 身份，缓存资料不能授予管理员权限。登录失败、API 401、连接鉴权失败不会回退到模拟身份。重连先清除旧房间视图，由服务端恢复仍存在的真实房间；服务器重启丢失房间时回到大厅。退出登录清理连接及牌桌状态。
+
 * **同服同端口直连**：浏览器访问与 WebSocket 握手统一位于当前域名根端口，零跨域开销；
 * **全生命周期信令支持**：
-  * 发出指令：`room:create`, `room:join`, `room:sit`, `room:stand`, `room:ready`, `game:look`, `game:bet`, `game:fold`, `game:compare`, `chat:emoji`, `chat:phrase`；
-  * 监听广播：`room:state`, `game:start`, `game:player_looked`, `game:player_bet`, `game:compare_result`, `game:over`, `chat:emoji_broadcast`, `chat:phrase_broadcast`；
+  * 发出指令：`room:create`, `room:join`, `room:sit`, `room:stand`, `room:leave`, `room:ready`, `game:look`, `game:bet`, `game:fold`, `game:compare`, `chat:emoji`, `chat:phrase`；
+  * 监听广播：`room:state`, `room:left`, `game:start`, `game:player_looked`, `game:player_bet`, `game:compare_result`, `game:over`, `chat:emoji_broadcast`, `chat:phrase_broadcast`；
   * 与客户端动效体系无缝触发（筹码柱飞入、全押震颤、金色流幅、PK 弹窗与结算礼花）。
 
 ---
@@ -240,35 +237,43 @@ App 视图流转体系
 
 | 模块类别 | 文件路径 | 职责定位 |
 | :--- | :--- | :--- |
-| **工程配置** | [package.json](file:///Users/prina/Downloads/pussyGame/client/package.json) | 前端依赖、构建命令与 TypeScript 配置 |
-| | [tailwind.config.js](file:///Users/prina/Downloads/pussyGame/client/tailwind.config.js) | 墨绿呢绒、筹码色系、震颤与金光关键帧动画 |
-| | [index.html](file:///Users/prina/Downloads/pussyGame/client/index.html) | 移动端防缩放、防橡皮筋回弹与安全区适配 |
-| **类型契约** | [game.ts](file:///Users/prina/Downloads/pussyGame/client/src/types/game.ts) | 卡牌、桌位、房间快照、结算与对决数据契约 |
-| **音频引擎** | [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts) | Web Audio API 纯代码合成发牌、翻牌、撞筹码、PK、Allin、胜利 6 种音效 |
-| **裁判引擎** | [pokerEvaluator.ts](file:///Users/prina/Downloads/pussyGame/client/src/utils/pokerEvaluator.ts) | 牌型识别、大小加权计算、特殊 235 杀豹子及平局判定 |
-| **排座算法** | [useTableLayout.ts](file:///Users/prina/Downloads/pussyGame/client/src/hooks/useTableLayout.ts) | 2~8 人动态三角函数第一人称居中排座与向心倾角计算 |
-| **状态管理** | [useGameStore.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/useGameStore.ts) | 牌桌状态、筹码堆队列、PK 与结算弹窗调度 |
-| | [useAuthStore.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/useAuthStore.ts) | JWT 令牌、当前登录人资料持久化与鉴权 |
-| | [mockGameService.ts](file:///Users/prina/Downloads/pussyGame/client/src/store/mock/mockGameService.ts) | 调用共用发牌与裁判，按本局牌库比牌、处理循环平分及单机闭环 |
-| **网络服务** | [api.ts](file:///Users/prina/Downloads/pussyGame/client/src/services/api.ts) | HTTP RESTful 客户端（登录、个人资料、管理员专区） |
-| | [socket.ts](file:///Users/prina/Downloads/pussyGame/client/src/services/socket.ts) | Socket.io 实时信令封装与事件分发 |
-| **桌位组件** | [Card3D.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/Card3D.tsx) | 3D 轴向透视翻转、扇形重叠与花色水印扑克 |
-| | [FlyingChipStack.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/FlyingChipStack.tsx) | 2.5D 多层分段成摞筹码、推入动效与常驻桌面阵型 |
-| | [TableSeat.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/TableSeat.tsx) | 头像轮廓、光圈倒计时、牌型胶囊、战败印戳与气泡 |
-| | [PokerTable.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/PokerTable.tsx) | 毛呢椭圆桌面、中央底池全息金字与桌位/筹码挂载 |
-| | [ActionPanel.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/ActionPanel.tsx) | 下注跟注、看牌、加注抽屉、比牌、Allin 与社交面板 |
-| **专属特效** | [PKClashModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/PKClashModal.tsx) | 1v1 绝密对撞撞击特写、烈火爆炸与战败印戳 |
-| | [AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx) | 全屏暗红雷电震颤、烈焰徽章与低音心跳震撼 |
-| | [GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx) | 5000+ 高额加注金色离子横幅与高光粒子 |
-| | [SettlementModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/SettlementModal.tsx) | 终局大捷奖杯、礼花飞舞、独揽筹码与亮牌展示 |
-| **调测平台** | [DevToolBar.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/dev/DevToolBar.tsx) | 左下角纯前端 Mock 调测控制台与 2~8 人切换台 |
-| **页面视图** | [LoginView.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/LoginView.tsx) | 登录视图与快速体验账号选择 |
-| | [LobbyView.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/LobbyView.tsx) | 大厅房间号加入、自建私局与规则速查指南 |
-| | [TableView.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/TableView.tsx) | 核心游戏对局主视图 |
-| | [AdminDashboard.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/AdminDashboard.tsx) | 管理中枢平台（账号管控、资金审计、算法调控与模拟器） |
-| | [LedgerDrawer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/LedgerDrawer.tsx) | 个人筹码明细战绩抽屉 |
-| | [App.tsx](file:///Users/prina/Downloads/pussyGame/client/src/App.tsx) | 应用主入口与基于角色的全域视图流转 |
+| **工程配置** | [package.json](../client/package.json) | 前端依赖、构建命令与 TypeScript 配置 |
+| | [tailwind.config.js](../client/tailwind.config.js) | 墨绿呢绒、筹码色系、震颤与金光关键帧动画 |
+| | [index.html](../client/index.html) | 移动端防缩放、防橡皮筋回弹与安全区适配 |
+| **类型契约** | [game.ts](../client/src/types/game.ts) | 卡牌、桌位、房间快照、结算与对决数据契约 |
+| **音频引擎** | [SoundManager.ts](../client/src/audio/SoundManager.ts) | Web Audio API 纯代码合成发牌、翻牌、撞筹码、PK、Allin、胜利 6 种音效 |
+| **裁判引擎** | [pokerEvaluator.ts](../client/src/utils/pokerEvaluator.ts) | 牌型识别、大小加权计算、特殊 235 杀豹子及平局判定 |
+| **排座算法** | [useTableLayout.ts](../client/src/hooks/useTableLayout.ts) | 2~8 人动态三角函数第一人称居中排座与向心倾角计算 |
+| **状态管理** | [useGameStore.ts](../client/src/store/useGameStore.ts) | 牌桌状态、筹码堆队列、PK 与结算弹窗调度 |
+| | [useAuthStore.ts](../client/src/store/useAuthStore.ts) | JWT 令牌、当前登录人资料持久化与鉴权 |
+| **网络服务** | [api.ts](../client/src/services/api.ts) | HTTP RESTful 客户端（登录、个人资料、管理员专区） |
+| | [socket.ts](../client/src/services/socket.ts) | Socket.io 实时信令封装与事件分发 |
+| **桌位组件** | [Card3D.tsx](../client/src/components/table/Card3D.tsx) | 3D 轴向透视翻转、扇形重叠与花色水印扑克 |
+| | [FlyingChipStack.tsx](../client/src/components/table/FlyingChipStack.tsx) | 2.5D 多层分段成摞筹码、推入动效与常驻桌面阵型 |
+| | [TableSeat.tsx](../client/src/components/table/TableSeat.tsx) | 头像轮廓、光圈倒计时、牌型胶囊、战败印戳与气泡 |
+| | [PokerTable.tsx](../client/src/components/table/PokerTable.tsx) | 毛呢椭圆桌面、中央底池全息金字与桌位/筹码挂载 |
+| | [ActionPanel.tsx](../client/src/components/table/ActionPanel.tsx) | 下注跟注、看牌、加注抽屉、比牌、Allin 与社交面板 |
+| **专属特效** | [PKClashModal.tsx](../client/src/components/animations/PKClashModal.tsx) | 1v1 绝密对撞撞击特写、烈火爆炸与战败印戳 |
+| | [AllInEpicEffect.tsx](../client/src/components/animations/AllInEpicEffect.tsx) | 全屏暗红雷电震颤、烈焰徽章与低音心跳震撼 |
+| | [GoldStreamer.tsx](../client/src/components/animations/GoldStreamer.tsx) | 5000+ 高额加注金色离子横幅与高光粒子 |
+| | [SettlementModal.tsx](../client/src/components/animations/SettlementModal.tsx) | 终局大捷奖杯、礼花飞舞、独揽筹码与亮牌展示 |
+| **页面视图** | [LoginView.tsx](../client/src/views/LoginView.tsx) | 真实账号登录与错误提示 |
+| | [LobbyView.tsx](../client/src/views/LobbyView.tsx) | 大厅房间号加入、自建私局与规则速查指南 |
+| | [TableView.tsx](../client/src/views/TableView.tsx) | 核心游戏对局主视图 |
+| | [AdminDashboard.tsx](../client/src/views/AdminDashboard.tsx) | 管理中枢平台（账号管控、资金审计、算法调控与模拟器） |
+| | [LedgerDrawer.tsx](../client/src/views/LedgerDrawer.tsx) | 个人筹码明细战绩抽屉 |
+| | [App.tsx](../client/src/App.tsx) | 应用主入口与基于角色的全域视图流转 |
 
 ### 2026-10-18 后端审查联动说明
 
-此次只修后端与契约，未修改上述页面代码。账号改密会使旧令牌失效并断开其在线连接，本次升级前令牌需要重新登录。资料及余额保存后，后端刷新所在房间快照；实际前端联机接入程度仍按本文各处“已实现/待实现”区分。详细范围见 [数据库与服务审查记录](database_service_review.md)。
+此前数据库与服务审查只修改后端与契约；本次已将上述正式页面接通，历史审查记录保持其当时范围。账号改密会使旧令牌失效并断开其在线连接，本次升级前令牌需要重新登录。资料及余额保存后，后端刷新所在房间快照；实际前端联机接入程度仍按本文各处“已实现/待实现”区分。详细范围见 [数据库与服务审查记录](database_service_review.md)。
+
+
+### 2026-10-18 正式流程验证补记
+
+本次变更双端构建、15 个文件共 305 项回归、6 项生产构建检查通过。新增正式认证状态、错误处理、人数校验、满员准备、断线取消准备及多窗口离房测试；已有模拟隐私与金额测试改用独立 `useMockGameStore`。Playwright 使用临时数据库及三个独立浏览器账号验证真实开号、错误密码、登录大厅、指定人数建房、实际入座与观战、满员且全员准备、无自动下注、手动跟注/看牌/弃牌、聊天、结算、下一局重新准备、刷新恢复、真实流水及退出。390 像素窄屏操作栏已验证完整显示。线上发布与公网检查见 [原生部署记录](native_deployment.md)。
+
+
+### 2026-10-19 仓库整理验证
+
+测试、调试工具栏、演示配置和部署工具仅本机维护。正式管理页已移除对演示配置模块的导入；前端编译排除本机辅助目录。迁移后的本地入口完成双端构建、305 项回归与 6 项生产产物检查，均通过。

@@ -32,7 +32,7 @@ SQLite 适合当前单进程、小规模熟人局；人员、余额流水与全�
 | 中 | 轮数只按座位号跨零递增，首轮可能尚未行动完就开放比牌；未知下注动作可零扣款推进回合 | [Room](../server/src/game/Room.ts) 按本轮尚未行动的存活玩家计轮，限制有效动作及累计金额 |
 | 中 | 管理员调账后座位余额陈旧，全押使用旧余额 | 下注/比牌读取实时钱包；资料、余额改动刷新房间；同时为新增同步链路固定观战对象投影，只保留 `id/nickname/avatar` |
 | 中 | 账号、资料、密码与分页缺少类型和长度校验；异步控制器异常未统一接入错误处理中间件；未实现接口可能返回页面 | [inputValidation.ts](../server/src/utils/inputValidation.ts)、控制器及 [index.ts](../server/src/index.ts) 补边界校验、异常包装和统一 API 404；限制密码编码长度，避免超长密码被静默截断 |
-| 中 | 镜像缺前端产物，且可能复制宿主机原生依赖、环境文件和数据库；相对静态路径不能用于页面回退 | [Dockerfile](../Dockerfile)、[.dockerignore](../.dockerignore) 补双端构建与排除项；路径绝对化且保留 SQLite `:memory:` 特殊值 |
+| 中 | 镜像缺前端产物，且可能复制宿主机原生依赖、环境文件和数据库；相对静态路径不能用于页面回退 | `Dockerfile`（仅本机保留）、`.dockerignore`（仅本机保留） 补双端构建与排除项；路径绝对化且保留 SQLite `:memory:` 特殊值 |
 | 中 | 部分控制器将未预期数据库异常作为 400 原样回显，泄露内部存储信息 | 新增测试复现资料更新、资金调整、改密三条链路，现仅已知业务错误保持 400，其余交统一脱敏 500；84 项账号接口回归覆盖 |
 | 中 | `ADMIN_USER` 与已有普通玩家重名时，启动静默跳过初始化，产生与配置不符的管理员状态 | [database.ts](../server/src/db/database.ts) 明确拒绝并回滚，不提权或覆盖原账号；39 项数据库回归覆盖 |
 
@@ -76,7 +76,7 @@ SQLite 适合当前单进程、小规模熟人局；人员、余额流水与全�
 
 ## 6. 上线前测试追补（2026-10-18）
 
-执行入口为根目录 `npm run test:release`，按顺序运行 `npm run build`、`npm test`、`npm --prefix server run test:smoke`，退出码 0。
+当时的执行入口为根目录 `npm run test:release`，按顺序运行 `npm run build`、`npm test`、`npm --prefix server run test:smoke`，退出码 0。
 
 | 检查 | 结果 | 实际验证范围 |
 | :--- | :--- | :--- |
@@ -85,10 +85,13 @@ SQLite 适合当前单进程、小规模熟人局；人员、余额流水与全�
 | 生产编译产物冒烟 | 6/6 通过 | 安全配置拒绝、页面/脚本托管、页面路由与接口 404、登录/开号/扣款/经办人审计、日志保密、重启后余额/流水保留且不重复初始化 |
 | 容器及实际环境 | 未执行 | 本机 Docker 守护进程未运行；未部署、未打开实际玩家数据库 |
 
-新增测试：[database-integrity.test.ts](../server/tests/database-integrity.test.ts) 39 项、[auth-validation.test.ts](../server/tests/auth-validation.test.ts) 84 项、[room-regressions.test.ts](../server/tests/room-regressions.test.ts) 34 项、[socket-regressions.test.ts](../server/tests/socket-regressions.test.ts) 9 项。生产检查脚本见 [production-smoke.ts](../server/tests/production-smoke.ts)。
+新增测试：`database-integrity.test.ts`（仅本机保留） 39 项、`auth-validation.test.ts`（仅本机保留） 84 项、`room-regressions.test.ts`（仅本机保留） 34 项、`socket-regressions.test.ts`（仅本机保留） 9 项。生产检查脚本见 `production-smoke.ts`（仅本机保留）。
 
 首次回归中，一个旧平分用例仅手动跨越零号座位就假定一轮结束，与已修复的完整轮次逻辑不符。现按三名存活玩家实际行动完成第 20 轮，逐步核对状态、扣款和三笔派奖，并分别验证 `45÷3` 与循环小数 `50÷3`，没有通过降低断言或跳过用例掩盖失败。首轮接口监听受沙箱端口权限限制，获准使用临时本机端口后执行了完整测试。
 
 测试环境固定隔离凭据及内存数据库；Vite 使用临时空环境目录，业务配置测试模式跳过 `.env`。迁移和生产检查另用系统临时目录，连接与服务关闭后删除；生产子进程从该临时目录启动，显式指定数据库与随机测试凭据，不依赖现有服务或玩家账号。测试期间没有部署或修改实际玩家数据。
 
 **上线判断仍有前提**：通过上述测试不能消除第 3 节已确认缺口。特别是在途底池随进程中断丢失、管理页写入失败仍可能显示成功以及流水抽屉使用模拟记录，仍应在真实资金上线前处理。另有重复调账去重、金额单位/余数规则、备份恢复及容器部署尚未完成验证；本次未自行决定或实现这些产品与恢复政策。赏金玩法继续仅为创想存档，不纳入近期实施。
+
+
+> 2026-10-19 仓库整理：本文保留历史审查结论。测试源码、专用依赖与运行配置现在只留本机，旧测试命令不再由游戏仓库声明。2026-10-18 后续上线变更已接通真实管理页面与流水，前端旧缺口以当前四份核心规范为准；在途底池恢复等未实现能力不因此改变。

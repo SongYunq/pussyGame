@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useGameStore } from '../store/useGameStore';
 import { api } from '../services/api';
-import { Sparkles, Lock, User, ArrowRight } from 'lucide-react';
+import { Lock, User, ArrowRight } from 'lucide-react';
 
 import { UserProfile } from '../types/game';
 
@@ -11,8 +11,8 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('zhangsan');
-  const [password, setPassword] = useState('user123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -29,20 +29,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       login(res.token, res.user);
       setCurrentUser(res.user);
       onLoginSuccess(res.user);
-    } catch {
-      // 若后端尚未启动或处于纯前端模式，提供安全回退快速进入
-      console.warn('后端服务未连接，使用离线模拟身份进入大厅');
-      const fallbackUser: UserProfile = {
-        id: username === 'admin' ? 999 : 1,
-        username: username || 'player1',
-        nickname: username === 'admin' ? '系统管理员' : '老友牌神',
-        avatar: username === 'admin' ? '🛡️' : '👑',
-        balance: 10000,
-        role: (username === 'admin' ? 'admin' : 'player') as 'player' | 'admin',
-      };
-      login('mock_jwt_token', fallbackUser);
-      setCurrentUser(fallbackUser);
-      onLoginSuccess(fallbackUser);
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : '登录失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -83,6 +71,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
+                autoComplete="username"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -100,6 +89,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -125,37 +115,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </button>
         </form>
 
-        {/* 快捷测试账号说明卡片 */}
-        <div className="mt-6 p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-amber-400 font-bold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>开发者体验账号（点击一键填入）：</span>
-          </div>
-          <div className="flex items-center justify-between bg-slate-900/60 hover:bg-slate-800/60 p-2 rounded-lg cursor-pointer transition border border-slate-800/80"
-            onClick={() => {
-              setUsername('admin');
-              setPassword('admin123456');
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-amber-400 font-bold">🛡️ 管理员后台：</span>
-              <code className="text-slate-200 font-mono">admin</code> / <code className="text-slate-300 font-mono">admin123456</code>
-            </div>
-            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-bold">填入管理员</span>
-          </div>
-          <div className="flex items-center justify-between bg-slate-900/60 hover:bg-slate-800/60 p-2 rounded-lg cursor-pointer transition border border-slate-800/80"
-            onClick={() => {
-              setUsername('zhangsan');
-              setPassword('user123456');
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="text-emerald-400 font-bold">👤 普通玩家：</span>
-              <code className="text-slate-200 font-mono">zhangsan</code> / <code className="text-slate-300 font-mono">user123456</code>
-            </div>
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">填入玩家</span>
-          </div>
-        </div>
+        <p className="mt-6 text-center text-xs text-slate-500">账号由管理员开通，请使用分配给你的账号和密码。</p>
+
       </div>
     </div>
   );

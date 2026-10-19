@@ -90,7 +90,7 @@ export function startServer() {
 
   setupSocketHandler(io);
 
-  server.listen(config.port, () => {
+  server.listen(config.port, config.host, () => {
     console.log(`=======================================================`);
     console.log(`🎉 炸金花游戏后端服务已成功启动！`);
     console.log(`📡 服务监听端口: http://localhost:${config.port}`);

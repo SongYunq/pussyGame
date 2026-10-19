@@ -15,7 +15,6 @@ interface ActionPanelProps {
   onStartPK: () => void;
   onSendEmoji: (emoji: string) => void;
   onSendPhrase: (phrase: string) => void;
-  onStartDeal?: () => void;
 }
 
 const EMOJIS = ['🔥', '😎', '😭', '💀', '💰', '👍', '🚀', '🍺'];
@@ -40,7 +39,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   onStartPK,
   onSendEmoji,
   onSendPhrase,
-  onStartDeal,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showPhrasePicker, setShowPhrasePicker] = useState(false);
@@ -129,7 +127,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+      <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         {/* 左侧：社交互动、看牌 + 轮数、当前注额与闷注信息 */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button
@@ -148,7 +146,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           </button>
 
           {/* 以当前注额为主，闷注金额作为补充说明 */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-[11px] font-mono font-bold">
+          <div className="flex shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-[11px] font-mono font-bold">
             <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-black">
               第 {currentRound}/20 轮
             </span>
@@ -174,7 +172,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           {isPlaying && isAlive && !hasLooked && (
             <button
               onClick={onLook}
-              className="flex items-center gap-1 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition"
+              className="flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition"
             >
               <Eye className="w-4 h-4" />
               <span>看牌</span>
@@ -184,12 +182,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
         {/* 右侧核心对局操作区 */}
         {isPlaying && isAlive ? (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
             {/* 弃牌 */}
             <button
               onClick={onFold}
               disabled={!isMyTurn}
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition shadow ${
+              className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-bold transition shadow ${
                 isMyTurn
                   ? 'bg-slate-800 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 active:scale-95'
                   : 'bg-slate-900/50 text-slate-600 border border-slate-800 cursor-not-allowed'
@@ -203,7 +201,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <button
               onClick={onStartPK}
               disabled={!canPK}
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition shadow ${
+              className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-bold transition shadow ${
                 canPK
                   ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-purple-500/20 active:scale-95'
                   : 'bg-slate-900/50 text-slate-600 border border-slate-800 cursor-not-allowed'
@@ -217,7 +215,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <button
               onClick={() => setShowRaiseDrawer(!showRaiseDrawer)}
               disabled={!isMyTurn}
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition border ${
+              className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-bold transition border ${
                 isMyTurn
                   ? 'border-amber-500/60 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
                   : 'border-slate-800 text-slate-600 cursor-not-allowed'
@@ -231,7 +229,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <button
               onClick={() => onBet('call', currentBet)}
               disabled={!isMyTurn || myBalance < callAmount}
-              className={`flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-lg ${
+              className={`flex items-center justify-center whitespace-nowrap gap-1 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-lg ${
                 isMyTurn && myBalance >= callAmount
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 active:scale-95 ring-2 ring-emerald-400/50'
                   : 'bg-slate-900/50 text-slate-600 border border-slate-800 cursor-not-allowed'
@@ -245,7 +243,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             <button
               onClick={() => onBet('allin', myBalance)}
               disabled={!isMyTurn || myBalance <= 0}
-              className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-black transition border shadow-lg ${
+              className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-black transition border shadow-lg ${
                 isMyTurn && myBalance > 0
                   ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white border-red-400 hover:scale-105 active:scale-95 shadow-red-600/40 animate-pulse'
                   : 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed'
@@ -258,15 +256,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         ) : (
           /* 等待开局模式 */
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">等待开局中...</span>
-            {onStartDeal && (
-              <button
-                onClick={onStartDeal}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black text-xs hover:from-amber-400 hover:to-yellow-500 shadow-lg shadow-amber-500/20 active:scale-95"
-              >
-                立即开局
-              </button>
-            )}
+            <span className="text-xs text-slate-400">{isPlaying ? (mySeat ? '本局已出局，等待结算' : '正在观战') : '等待开局中…'}</span>
+
           </div>
         )}
       </div>

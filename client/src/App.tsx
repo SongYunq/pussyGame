@@ -1,79 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthStore } from './store/useAuthStore';
+import { useGameStore } from './store/useGameStore';
+import { api } from './services/api';
+import { socketService } from './services/socket';
 import { LoginView } from './views/LoginView';
 import { LobbyView } from './views/LobbyView';
 import { TableView } from './views/TableView';
 import { AdminDashboard } from './views/AdminDashboard';
 import { LedgerDrawer } from './views/LedgerDrawer';
-import { UserProfile } from './types/game';
-
-type ViewMode = 'login' | 'lobby' | 'table' | 'admin';
 
 export const App: React.FC = () => {
-  const { isAuthenticated, user, logout } = useAuthStore();
-  const [currentView, setCurrentView] = useState<ViewMode>(() => {
-    if (!isAuthenticated) return 'login';
-    if (user?.role === 'admin') return 'admin';
-    return 'table';
-  });
-  const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+  const { token, user, isAuthenticated, isRestoring, login, logout } = useAuthStore();
+  const roomState = useGameStore(state => state.roomState);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
 
-  // 超级管理员账号纯管理系统运作，完全隔离牌桌与大厅
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin' && currentView !== 'admin') {
-      setCurrentView('admin');
-    }
-  }, [isAuthenticated, user, currentView]);
+    if (!isRestoring || !token) return;
+    let active = true;
+    api.getMe().then(profile => { if (active) login(token, profile); })
+      .catch(() => { if (active) logout(); });
+    return () => { active = false; };
+  }, [isRestoring, token, login, logout]);
 
-  const handleLoginSuccess = (loggedInUser: UserProfile) => {
-    if (loggedInUser.role === 'admin') {
-      setCurrentView('admin');
-    } else {
-      setCurrentView('table');
-    }
-  };
+  useEffect(() => {
+    if (!isAuthenticated || !token || !user) return;
+    useGameStore.getState().setCurrentUser(user);
+    socketService.connect(token);
+    return () => { socketService.disconnect(); useGameStore.getState().reset(); };
+  }, [isAuthenticated, token, user?.id]);
 
-  const handleLogout = () => {
-    logout();
-    setCurrentView('login');
-  };
+  if (isRestoring) return <div className="h-full flex items-center justify-center bg-slate-950 text-slate-300">正在验证登录状态…</div>;
+  if (!isAuthenticated || !user) return <LoginView onLoginSuccess={() => {}} />;
 
-  // 未登录时强制显示登录视图
-  if (!isAuthenticated && currentView !== 'login') {
-    return <LoginView onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  return (
-    <div className="h-full w-full bg-slate-950 font-sans antialiased text-slate-100 overflow-hidden flex flex-col">
-      {currentView === 'login' && (
-        <LoginView onLoginSuccess={handleLoginSuccess} />
-      )}
-
-      {currentView === 'lobby' && (
-        <LobbyView
-          onEnterRoom={(_roomId) => setCurrentView('table')}
-          onOpenLedger={() => setIsLedgerOpen(true)}
-          onOpenAdmin={() => setCurrentView('admin')}
-        />
-      )}
-
-      {currentView === 'table' && (
-        <TableView
-          onBackToLobby={() => setCurrentView('lobby')}
-          onOpenLedger={() => setIsLedgerOpen(true)}
-        />
-      )}
-
-      {currentView === 'admin' && (
-        <AdminDashboard
-          onLogout={handleLogout}
-        />
-      )}
-
-      {/* 全局个人流水战绩抽屉 */}
-      <LedgerDrawer isOpen={isLedgerOpen} onClose={() => setIsLedgerOpen(false)} />
-    </div>
-  );
+  return <div className="h-full w-full bg-slate-950 text-slate-100 overflow-hidden flex flex-col">
+    {user.role === 'admin' ? <AdminDashboard onLogout={logout} /> : roomState ?
+      <TableView onBackToLobby={() => { void socketService.leaveRoom().catch(() => {}); }} onOpenLedger={() => setLedgerOpen(true)} /> :
+      <LobbyView onOpenLedger={() => setLedgerOpen(true)} onLogout={logout} />}
+    <LedgerDrawer isOpen={ledgerOpen} onClose={() => setLedgerOpen(false)} />
+  </div>;
 };
-
 export default App;

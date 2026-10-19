@@ -51,6 +51,7 @@ export function setupSocketHandler(io: Server): void {
       socket.join(`room:${existingRoom.roomId}`);
       existingRoom.setIo(io);
       socket.emit('room:state', existingRoom.getMaskedState(userId));
+      existingRoom.broadcastState();
     }
 
     // 注册各类事件
@@ -64,12 +65,17 @@ export function setupSocketHandler(io: Server): void {
 
       const room = RoomManager.findRoomByUserId(userId);
       if (room) {
+        const lastConnection = !RoomManager.getUserOnlineStatus(userId).isOnline;
+        if (lastConnection && room.gameStatus === 'waiting' && room.findSeatIndexByUserId(userId) !== -1) {
+          room.setReady(userId, false);
+        }
         // 若仅在观战席，离开房间并清除
         if (room.spectators.has(userId) && !RoomManager.getUserOnlineStatus(userId).isOnline) {
           room.removeSpectator(userId);
           room.broadcastState();
           RoomManager.removeEmptyRoom(room.roomId);
         }
+        room.broadcastState();
         // 保留座位与牌面等待重连；限时房间继续倒计时，无限制房间等待手动操作
       }
     });

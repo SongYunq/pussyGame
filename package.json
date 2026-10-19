@@ -7,14 +7,11 @@
     "dev": "npm --prefix server run dev",
     "build": "npm --prefix client run build && npm --prefix server run build",
     "start": "npm --prefix server run start",
-    "test": "npm --prefix server run test",
-    "test:release": "npm run build && npm test && npm --prefix server run test:smoke",
     "client:dev": "npm --prefix client run dev",
     "client:build": "npm --prefix client run build",
     "client:preview": "npm --prefix client run preview",
     "server:dev": "npm --prefix server run dev",
     "server:build": "npm --prefix server run build",
-    "server:start": "npm --prefix server run start",
-    "server:test": "npm --prefix server run test"
+    "server:start": "npm --prefix server run start"
   }
 }

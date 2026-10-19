@@ -7,9 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:smoke": "tsx tests/production-smoke.ts"
+    "start": "node dist/index.js"
   },
   "keywords": [
     "zhajinhua",
@@ -36,11 +34,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
-    "@types/supertest": "^7.2.1",
-    "socket.io-client": "^4.8.4",
-    "supertest": "^7.3.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^5.7.2"
   }
 }

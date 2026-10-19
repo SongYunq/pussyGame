@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import { GUARANTEE_TYPES, SimulationResult, defaultAlgorithmConfig, simulateDeals, validateAlgorithmConfig } from '../../../server/src/shared/dealing';
+import { GUARANTEE_TYPES, SimulationResult, defaultAlgorithmConfig, validateAlgorithmConfig } from '../../../server/src/shared/dealing';
 import { HAND_NAMES } from '../../../server/src/shared/poker';
 import { api } from '../services/api';
-import { readLocalAlgorithmConfig, saveLocalAlgorithmConfig } from '../services/algorithmConfig';
 
 const branches: Record<string, string> = { standard_random: '标准牌 · 随机', standard_rival: '标准牌 · 冤家', standard_guarantee: '标准牌 · 保底', short_random: '短牌 · 随机', short_rival: '短牌 · 冤家' };
 const inputClass = 'w-20 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-center text-sm font-mono text-slate-100';
 const sectionClass = 'rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-3';
 
-export function AlgorithmPanel({ local }: { local: boolean }) {
+export function AlgorithmPanel() {
   const [draft, setDraft] = useState(defaultAlgorithmConfig);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -26,14 +25,14 @@ export function AlgorithmPanel({ local }: { local: boolean }) {
     setLoading(true); setLoaded(false); setFailure(''); setMessage('');
     (async () => {
       try {
-        const config = local ? readLocalAlgorithmConfig() : await api.adminGetAlgorithmConfig();
+        const config = await api.adminGetAlgorithmConfig();
         if (active) { setDraft(validateAlgorithmConfig(config)); setLoaded(true); }
       } catch (error) {
         if (active) setFailure(error instanceof Error ? error.message : '读取配置失败');
       } finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [local, reload]);
+  }, [reload]);
 
   let validation = '';
   try { validateAlgorithmConfig(draft); } catch (error) { validation = error instanceof Error ? error.message : '配置无效'; }
@@ -42,9 +41,9 @@ export function AlgorithmPanel({ local }: { local: boolean }) {
     setSaving(true); setFailure(''); setMessage('');
     try {
       const config = validateAlgorithmConfig(draft);
-      const saved = local ? saveLocalAlgorithmConfig(config) : await api.adminSaveAlgorithmConfig(config);
+      const saved = await api.adminSaveAlgorithmConfig(config);
       setDraft(saved);
-      setMessage(local ? '本地演示配置已保存，从下一局开始生效。' : '联机配置已保存，从下一局开始生效。');
+      setMessage('联机配置已保存，从下一局开始生效。');
     } catch (error) { setFailure(error instanceof Error ? error.message : '保存失败'); }
     finally { setSaving(false); }
   }
@@ -52,7 +51,7 @@ export function AlgorithmPanel({ local }: { local: boolean }) {
     setSimulating(true); setFailure(''); setResult(null);
     try {
       const config = validateAlgorithmConfig(draft);
-      const data = local ? await simulateDeals(rounds, players, config) : await api.adminSimulateAlgorithm(rounds, players, config);
+      const data = await api.adminSimulateAlgorithm(rounds, players, config);
       setResult(data);
     } catch (error) { setFailure(error instanceof Error ? error.message : '模拟失败'); }
     finally { setSimulating(false); }
@@ -67,7 +66,7 @@ export function AlgorithmPanel({ local }: { local: boolean }) {
 
   return <div className="space-y-4 max-w-6xl mx-auto">
     <div className="flex flex-wrap justify-between gap-3 items-start">
-      <div><h2 className="text-xl font-black text-amber-400">发牌规则配置</h2><p className="text-xs text-slate-400 mt-1">{local ? '本地演示' : '联机牌局'} · 保存后从下一局生效 · 已开始的牌局保持原规则</p></div>
+      <div><h2 className="text-xl font-black text-amber-400">发牌规则配置</h2><p className="text-xs text-slate-400 mt-1">联机牌局 · 保存后从下一局生效 · 已开始的牌局保持原规则</p></div>
       <button className="text-sm text-slate-300 underline" disabled={saving || simulating} onClick={() => setReload(n => n + 1)}>重新载入</button>
     </div>
     {loading && <p role="status" className="text-slate-300">正在读取配置…</p>}

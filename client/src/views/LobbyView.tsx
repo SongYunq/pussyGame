@@ -1,46 +1,42 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useGameStore } from '../store/useGameStore';
-import { PlusCircle, LogIn, BookOpen, Shield, FileText, Volume2, VolumeX, LogOut, ChevronRight } from 'lucide-react';
+import { socketService } from '../services/socket';
+import { PlusCircle, LogIn, BookOpen, FileText, Volume2, VolumeX, LogOut, ChevronRight } from 'lucide-react';
 
 interface LobbyViewProps {
-  onEnterRoom: (roomId: string) => void;
   onOpenLedger: () => void;
-  onOpenAdmin: () => void;
+  onLogout: () => void;
 }
 
 export const LobbyView: React.FC<LobbyViewProps> = ({
-  onEnterRoom,
   onOpenLedger,
-  onOpenAdmin,
+  onLogout,
 }) => {
-  const { user, logout } = useAuthStore();
-  const { isMuted, toggleMute, createMockRoom } = useGameStore();
+  const { user } = useAuthStore();
+  const { isMuted, toggleMute, connectionStatus, actionPending, error } = useGameStore();
 
   const [inputRoomId, setInputRoomId] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
 
   // 创建房间表单
+  const [playerCount, setPlayerCount] = useState(4);
+  const unavailable = connectionStatus !== 'connected' || actionPending;
   const [newRoomName, setNewRoomName] = useState('老友欢聚私房');
   const [newBaseAnte, setNewBaseAnte] = useState(10);
   const [newTurnSeconds, setNewTurnSeconds] = useState(20);
 
-  const handleJoinRoom = (e: React.FormEvent) => {
+  const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputRoomId.trim()) return;
-    onEnterRoom(inputRoomId.trim());
+    if (!inputRoomId.trim() || unavailable) return;
+    try { await socketService.joinRoom(inputRoomId.trim()); } catch { /* 服务错误由状态栏显示 */ }
   };
-
-  const handleCreateRoom = (e: React.FormEvent) => {
+  const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    const roomId = createMockRoom({
-      roomName: newRoomName,
-      baseAnte: newBaseAnte,
-      turnSeconds: newTurnSeconds,
-    });
-    setShowCreateModal(false);
-    onEnterRoom(roomId);
+    if (unavailable) return;
+    try { await socketService.createRoom(newRoomName.trim(), newBaseAnte, newTurnSeconds, playerCount); }
+    catch { /* 保留表单以便修正 */ }
   };
 
   return (
@@ -73,18 +69,6 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <span className="hidden sm:inline">账本</span>
           </button>
 
-          {/* 管理员专区 */}
-          {user?.role === 'admin' && (
-            <button
-              onClick={onOpenAdmin}
-              className="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition flex items-center gap-1 text-xs border border-amber-500/30"
-              title="管理后台"
-            >
-              <Shield className="w-4 h-4" />
-              <span className="hidden sm:inline">管理后台</span>
-            </button>
-          )}
-
           {/* 静音开关 */}
           <button
             onClick={toggleMute}
@@ -95,7 +79,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
           {/* 登出 */}
           <button
-            onClick={logout}
+            onClick={onLogout}
             className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 transition"
             title="退出登录"
           >
@@ -116,6 +100,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           </p>
         </div>
 
+        <p role="status" className="mb-4 text-sm text-slate-400">{connectionStatus === 'connected' ? '已连接服务器' : '正在连接服务器…'}</p>
+        {error && <p role="alert" className="mb-4 text-rose-300">{error}</p>}
         {/* 核心操作卡片网格 */}
         <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           {/* 1. 快捷加入房间卡片 */}
@@ -131,13 +117,15 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <form onSubmit={handleJoinRoom} className="mt-6 flex gap-2">
               <input
                 type="text"
+                required
+                aria-label="房间号"
                 value={inputRoomId}
                 onChange={(e) => setInputRoomId(e.target.value)}
-                placeholder="4~6 位房间号 (如 8888)"
+                placeholder="请输入朋友的房间号"
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-amber-400"
               />
               <button
-                type="submit"
+                type="submit" disabled={unavailable}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md"
               >
                 加入
@@ -152,11 +140,11 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                 <PlusCircle className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-100">创建专属私局</h3>
-              <p className="text-xs text-slate-400 mt-1">自由配置底注与思考时间</p>
+              <p className="text-xs text-slate-400 mt-1">选择人数、底注与思考时间，满员且全员准备后开局</p>
             </div>
 
             <button
-              onClick={() => setShowCreateModal(true)}
+              disabled={unavailable} onClick={() => setShowCreateModal(true)}
               className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs transition shadow-md flex items-center justify-center gap-1.5"
             >
               <span>立即开辟新房间</span>
@@ -186,11 +174,18 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           <div className="w-full max-w-md bg-slate-900 border border-amber-500/40 rounded-3xl p-6 shadow-2xl">
             <h3 className="text-lg font-black text-slate-100 mb-4">创建游戏房间</h3>
             <form onSubmit={handleCreateRoom} className="flex flex-col gap-4">
+              <label className="text-sm text-slate-300">开局人数
+                <select aria-label="开局人数" className="ml-3 bg-slate-950 border border-slate-700 rounded-xl p-2" value={playerCount} onChange={e => setPlayerCount(Number(e.target.value))}>
+                  {[2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} 人</option>)}
+                </select>
+              </label>
+              <p className="text-xs text-slate-400">所有人入座并点击准备后自动开局，每局结束后重新准备。</p>
+              {error && <p role="alert" className="text-rose-300 text-sm">{error}</p>}
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">房间名称</label>
                 <input
                   type="text"
-                  required
+                  required maxLength={30} aria-label="房间名称"
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 outline-none focus:border-amber-400"
@@ -253,7 +248,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   取消
                 </button>
                 <button
-                  type="submit"
+                  type="submit" disabled={unavailable}
                   className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow"
                 >
                   确认创建
