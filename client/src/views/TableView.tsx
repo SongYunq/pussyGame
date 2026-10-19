@@ -25,7 +25,9 @@ export const TableView: React.FC<TableViewProps> = ({
     activePKClash,
     activeSettlement,
     isAllInTriggered,
+    allInInfo,
     isGoldStreamTriggered,
+    goldStreamInfo,
     floatingBubbles,
     flyingChips,
     isMuted,
@@ -43,7 +45,7 @@ export const TableView: React.FC<TableViewProps> = ({
   } = useGameStore();
 
   const mySeat = roomState.seats.find((s) => s?.user?.id === currentUser.id) || null;
-  const isMyTurn = roomState.currentTurnPlayerId === currentUser.id;
+  const isMyTurn = roomState.currentTurnPlayerId === currentUser.id && !isGoldStreamTriggered;
 
   return (
     <div className="relative w-full h-full flex flex-col justify-between bg-slate-950 text-slate-100 overflow-hidden select-none">
@@ -71,7 +73,7 @@ export const TableView: React.FC<TableViewProps> = ({
               </span>
             </div>
             <span className="text-[10px] text-slate-400">
-              {roomState.deckKind === 'short' ? '28 张短牌' : '52 张标准牌'} · 底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds}s
+              {roomState.deckKind === 'short' ? '28 张短牌' : '52 张标准牌'} · 底注: {roomState.baseAnte} · 思考: {roomState.turnSeconds === 0 ? '无限制' : `${roomState.turnSeconds}s`}
             </span>
           </div>
         </div>
@@ -133,6 +135,7 @@ export const TableView: React.FC<TableViewProps> = ({
           onSelectPKTarget={compareWithPlayer}
           floatingBubbles={floatingBubbles}
           flyingChips={flyingChips}
+          isAllInTriggered={isAllInTriggered}
         />
       </main>
 
@@ -158,14 +161,15 @@ export const TableView: React.FC<TableViewProps> = ({
         <PKClashModal
           clashEvent={activePKClash}
           seats={roomState.seats}
+          viewerId={currentUser.id}
           onClose={closePKClash}
         />
       )}
 
-      {isAllInTriggered && <AllInEpicEffect />}
-      {isGoldStreamTriggered && <GoldStreamer />}
+      {isAllInTriggered && <AllInEpicEffect info={allInInfo} />}
+      {isGoldStreamTriggered && <GoldStreamer info={goldStreamInfo} />}
 
-      {activeSettlement && (
+      {activeSettlement && !activePKClash && (
         <SettlementModal
           settlementEvent={activeSettlement}
           seats={roomState.seats}

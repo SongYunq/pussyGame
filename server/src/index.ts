@@ -1,7 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { config } from './config/index.js';
@@ -13,6 +13,12 @@ import { UserController } from './controllers/userController.js';
 import { AdminController } from './controllers/adminController.js';
 import { AlgorithmController } from './controllers/algorithmController.js';
 import { setupSocketHandler } from './socket/socketHandler.js';
+
+function asyncHandler(handler: (req: Request, res: Response) => void | Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    Promise.resolve().then(() => handler(req, res)).catch(next);
+  };
+}
 
 export function createApp() {
   // 1. 初始化数据库
@@ -26,24 +32,26 @@ export function createApp() {
   const apiRouter = express.Router();
 
   // 鉴权模块
-  apiRouter.post('/auth/login', AuthController.login);
-  apiRouter.get('/auth/me', authenticateHttp, AuthController.getMe);
+  apiRouter.post('/auth/login', asyncHandler(AuthController.login));
+  apiRouter.get('/auth/me', authenticateHttp, asyncHandler(AuthController.getMe));
 
   // 用户与个人流水模块
-  apiRouter.put('/user/profile', authenticateHttp, UserController.updateProfile);
-  apiRouter.get('/user/ledger', authenticateHttp, UserController.getLedger);
+  apiRouter.put('/user/profile', authenticateHttp, asyncHandler(UserController.updateProfile));
+  apiRouter.get('/user/ledger', authenticateHttp, asyncHandler(UserController.getLedger));
 
   // 管理员后台专区
-  apiRouter.post('/admin/users', authenticateHttp, requireAdmin, AdminController.createUser);
-  apiRouter.get('/admin/users', authenticateHttp, requireAdmin, AdminController.listUsers);
-  apiRouter.post('/admin/users/:id/chips', authenticateHttp, requireAdmin, AdminController.modifyChips);
-  apiRouter.post('/admin/users/:id/reset-password', authenticateHttp, requireAdmin, AdminController.resetPassword);
-  apiRouter.get('/admin/audit-logs', authenticateHttp, requireAdmin, AdminController.getAuditLogs);
-  apiRouter.get('/admin/algorithm/config', authenticateHttp, requireAdmin, AlgorithmController.getConfig);
-  apiRouter.post('/admin/algorithm/config', authenticateHttp, requireAdmin, AlgorithmController.saveConfig);
-  apiRouter.post('/admin/algorithm/simulate', authenticateHttp, requireAdmin, AlgorithmController.simulate);
+  apiRouter.post('/admin/users', authenticateHttp, requireAdmin, asyncHandler(AdminController.createUser));
+  apiRouter.get('/admin/users', authenticateHttp, requireAdmin, asyncHandler(AdminController.listUsers));
+  apiRouter.post('/admin/users/:id/chips', authenticateHttp, requireAdmin, asyncHandler(AdminController.modifyChips));
+  apiRouter.post('/admin/users/:id/reset-password', authenticateHttp, requireAdmin, asyncHandler(AdminController.resetPassword));
+  apiRouter.get('/admin/audit-logs', authenticateHttp, requireAdmin, asyncHandler(AdminController.getAuditLogs));
+  apiRouter.get('/admin/algorithm/config', authenticateHttp, requireAdmin, asyncHandler(AlgorithmController.getConfig));
+  apiRouter.post('/admin/algorithm/config', authenticateHttp, requireAdmin, asyncHandler(AlgorithmController.saveConfig));
+  apiRouter.post('/admin/algorithm/simulate', authenticateHttp, requireAdmin, asyncHandler(AlgorithmController.simulate));
 
-  app.use('/api', apiRouter);
+  app.use('/api', apiRouter, (_req: Request, res: Response) => {
+    res.status(404).json({ code: 404, message: '接口不存在', data: null });
+  });
 
   // 3. 生产单端口静态托管 (若 client/dist 存在则直接提供静态前端)
   if (fs.existsSync(config.clientDistPath)) {
@@ -87,7 +95,7 @@ export function startServer() {
     console.log(`🎉 炸金花游戏后端服务已成功启动！`);
     console.log(`📡 服务监听端口: http://localhost:${config.port}`);
     console.log(`🛡️ 数据库路径: ${config.dbPath}`);
-    console.log(`👑 默认管理员账号: ${config.defaultAdmin.username} / ${config.defaultAdmin.password}`);
+    console.log(`👑 默认管理员账号: ${config.defaultAdmin.username}`);
     console.log(`=======================================================`);
   });
 

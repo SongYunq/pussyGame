@@ -1,7 +1,8 @@
 # 炸金花联机游戏 —— 后端架构设计与技术实现规范白皮书 (Backend Architecture & Implementation Specification)
 
-> **文档定位与说明**：本文档基于当前后端完整工程源码（[`server/`](file:///Users/prina/Downloads/pussyGame/server/)）进行全面复盘、系统梳理与标准规范化更新。内容涵盖 Node.js + Express + Socket.io + SQLite 架构体系、无作弊防泄密权威裁判引擎、纯内存房间状态机、原子账本经济体系、管理员多维管控中枢、生产单端口静态托管、Docker 容器化部署、自动化测试验证体系，以及针对玩家规则深度研讨的“爆金币赏金击杀流”扩展设计。
+> **文档定位与说明**：本文档基于当前后端完整工程源码（[`server/`](file:///Users/prina/Downloads/pussyGame/server/)）进行全面复盘、系统梳理与标准规范化更新。内容涵盖 Node.js + Express + Socket.io + SQLite 架构体系、无作弊防泄密权威裁判引擎、纯内存房间状态机、原子账本经济体系、管理员多维管控中枢、生产单端口静态托管、Docker 容器化部署及自动化测试验证体系。第九节“爆金币赏金击杀流”仅为创想存档，尚未实现，短期内不计划开发，不属于当前或近期交付范围。
 > 相关协议与设计参考：[api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)、[frontend_requirements.md](file:///Users/prina/Downloads/pussyGame/docs/frontend_requirements.md)。
+> 最近审查与验证：2026-10-18。静态审查后已按用户要求补写并运行测试：14 个文件、291 项全部通过，双端构建与 6 项生产产物冒烟检查通过。修复、验证范围与上线前未完成项见 [数据库与服务审查记录](database_service_review.md)。
 > 发牌算法规则、自然概率基线及后续变更同步要求统一见：[dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
 
 ---
@@ -27,7 +28,7 @@
 * **实时全双工网关**：Socket.io 4.8（基于 WebSocket + HTTP Polling 自动降级，承载毫秒级房间流转信令）；
 * **嵌入式存储引擎**：`better-sqlite3` 11.8（单文件轻量持久化，启用 WAL 高并发预写日志，微秒级查询响应，零独立外部 DB 服务运维负担）；
 * **密码与凭证安全**：`bcryptjs`（Salt 轮数 10，单向哈希加密密码）+ `jsonwebtoken`（无状态 JWT 凭据，7 天有效期）；
-* **自动化测试矩阵**：Vitest 3.0 + Supertest 7.0 + Socket.io-client 4.8（涵盖算法单测、状态机单测、API 鉴权测试与真实双客户端 E2E 对局模拟）。
+* **自动化测试矩阵**：Vitest 2.1 + Supertest 7.2 + Socket.io-client 4.8（涵盖算法单测、状态机单测、API 鉴权测试与真实双客户端 E2E 对局模拟）。
 
 ### 1.2 核心职责与设计原则
 ```
@@ -65,10 +66,10 @@
 1. **绝对权威防作弊（Zero-Trust Client）**：
    - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](file:///Users/prina/Downloads/pussyGame/server/src/game/GameReferee.ts) 与 [`Room`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 严格决断；
    - 客户端只能上报操作意图（如 `game:look`, `game:bet`, `game:compare`），服务端严密校验合法性；
-   - **单连接单独脱敏**：服务端下发全桌快照时，向 Socket A 发送的数据中，除 Socket A 自己的底牌外，其余玩家的手牌强制置为 `null`；观战者视角全员手牌为 `null`。
-2. **原子金融级账本（ACID SQLite Transactions）**：
+   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌，以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
+2. **账户与流水的原子写入（SQLite Transactions）**：
    - 玩家入座直接使用钱包账户余额，所有底注、跟注、加注、比牌扣除与胜利奖金派发，均在 SQLite `db.transaction()` 中原子完成；
-   - 绝不允许“先下注成功、写库失败”的脏数据，余额非负强约束，杜绝刷币与坏账；
+   - 每笔余额变化与对应流水在同一事务中提交；底注批扣和终局多笔派奖另有外层事务。该保证不覆盖内存牌局的进程崩溃恢复，详见第 2.6 节；
 3. **管理后台与自主经济闭环**：
    - 针对熟人私局场景，无需开放公网恶意注册；由超级管理员在管理后台统一定制发放账号、设置初始筹码、实时充减、重置密码与追溯全服流水；
 4. **单端口一站式部署**：
@@ -82,7 +83,7 @@ server/
 │   ├── config/
 │   │   └── index.ts            # 全局配置中心 (端口、JWT密钥、路径、默认管理员)
 │   ├── db/
-│   │   └── database.ts         # SQLite 连接池、WAL模式、建表与管理员初始发号
+│   │   └── database.ts         # SQLite 单连接、WAL模式、增量迁移与管理员初始发号
 │   ├── types/
 │   │   └── index.ts            # 全局 TypeScript 接口契约定义
 │   ├── utils/
@@ -123,85 +124,59 @@ server/
 
 数据库持久化文件位于 [`server/data/game.db`](file:///Users/prina/Downloads/pussyGame/server/data/game.db)，服务首次启动时由 [`server/src/db/database.ts`](file:///Users/prina/Downloads/pussyGame/server/src/db/database.ts) 执行 `initTables` 与 `initDefaultAdmin` 自动完成初始化。
 
-### 2.1 用户表结构 (`users`)
-存放系统所有注册玩家与管理员账户实体：
-```sql
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL,       -- 账号名（英文字符与数字组合，全局唯一）
-  password_hash TEXT NOT NULL,         -- bcrypt 哈希加密密文 (Cost: 10)
-  nickname TEXT NOT NULL,              -- 显示昵称 (如 "赌怪张三")
-  avatar TEXT DEFAULT 'avatar_1.png',  -- 头像标识
-  balance INTEGER DEFAULT 0,           -- 钱包可用筹码余额（不可为负）
-  role TEXT DEFAULT 'player',          -- 用户角色: 'player' 玩家 | 'admin' 管理员
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+### 2.1 已持久化的实体与约束
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-```
+当前只有三张业务表；房间、座位、底池、手牌及在线状态没有落库。
 
-### 2.2 筹码流水账本表 (`ledgers`)
-记录全系统所有的筹码资产进出变动，单向追加写入，不可篡改：
-```sql
-CREATE TABLE IF NOT EXISTS ledgers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,            -- 关联的用户 ID
-  type TEXT NOT NULL,                  -- 流水类型: 'recharge' | 'deduct' | 'ante' | 'bet' | 'game_win'
-  amount INTEGER NOT NULL,             -- 变动数额 (正数为增加，负数为扣减)
-  balance_after INTEGER NOT NULL,      -- 变动后即时结余
-  description TEXT,                    -- 业务说明 (如 "第 8888 房间底注扣除", "发起比牌对决")
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
+| 表 | 字段与用途 |
+| :--- | :--- |
+| `users` | `id` 主键；`username` 唯一且非空；`password_hash`、`nickname` 非空；`avatar`；`balance`；`role`；`auth_version`；`created_at`、`updated_at` |
+| `ledgers` | `id` 主键；`user_id` 外键；`type`；`amount`；`balance_after`；`description`；`operator_id` 可空用户外键；`room_id` 可空文本；`created_at` |
+| `game_settings` | `key` 主键；`value` JSON 文本；`updated_at`；当前条目为 `dealing_config_v1` |
 
-CREATE INDEX IF NOT EXISTS idx_ledgers_user_id ON ledgers(user_id);
-CREATE INDEX IF NOT EXISTS idx_ledgers_created_at ON ledgers(created_at);
-```
+新库的余额和流水金额采用 `NUMERIC` 类型。旧库原有 `INTEGER` 列不重建；SQLite 的类型亲和性允许其中保存实际玩法产生的小数，不能据此声称整数精确记账。闷牌半注和多人平分保持现有行为，最小筹码单位及尾差分配政策仍待确定。
 
-### 2.3 原子事务控制与防刷原则 (`UserModel.changeBalance`)
-在对局中，玩家的扣底注、下注、比牌消耗以及最终赢牌入账，全部封装在 SQLite 原子事务中（参考 [`UserModel.changeBalance`](file:///Users/prina/Downloads/pussyGame/server/src/models/userModel.ts)）：
-```typescript
-static changeBalance(
-  userId: number,
-  amount: number,
-  type: 'recharge' | 'deduct' | 'ante' | 'bet' | 'game_win',
-  description: string
-): { balance: number } {
-  const db = getDb();
-  const transaction = db.transaction(() => {
-    const user = db.prepare('SELECT id, balance FROM users WHERE id = ?').get(userId);
-    if (!user) throw new Error('用户不存在');
+数据库触发器同时覆盖新旧库后续写入：余额必须为非负数值且不超过 `Number.MAX_SAFE_INTEGER`，角色限 `player/admin`，凭据版本为非负整数；流水金额非零且类型与正负方向相符，结余非负。流水禁止普通 `UPDATE/DELETE`，应用只能追加；数据库文件的持有者仍可改结构，这不是防篡改存证。
 
-    const newBalance = user.balance + amount;
-    if (newBalance < 0) {
-      throw new Error('筹码余额不足'); // 强校验：严禁产生负数余额
-    }
+索引包括用户名、流水用户编号、创建时间，以及适配个人流水倒序分页的 `(user_id, id DESC)`。`username UNIQUE` 已有唯一索引；保留原有显式索引以兼容旧库。
 
-    db.prepare('UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(newBalance, userId);
+### 2.2 余额与流水的事务边界
 
-    db.prepare(`
-      INSERT INTO ledgers (user_id, type, amount, balance_after, description)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(userId, type, amount, newBalance, description);
+[UserModel](../server/src/models/userModel.ts) 的 `changeBalance(userId, amount, type, description, context?)` 在同一事务中读取余额、校验、更新 `users`、插入 `ledgers`；失败时整体回滚。它校验用户编号、有限金额、安全数量级、金额方向和结果余额，不允许零变动或计算后余额完全不变。
 
-    return { balance: newBalance };
-  });
+- `recharge/game_win` 必须为正，`deduct/ante/bet` 必须为负。
+- `context.operatorId` 由管理员控制器从已鉴权身份传入，客户端不能指定经办人；`context.roomId` 由房间服务传入。
+- 开号初始筹码与其充值流水原子创建；初始值为零时不产生资金流水。
+- 全部开局底注位于同一外层事务，多人派奖同样位于同一外层事务，成功后才更新对应内存金额。
+- 管理员调账和资料修改完成后，通过 `RoomManager.refreshUser` 刷新所在房间快照；下注、全押及比牌还会读取数据库最新余额。
 
-  return transaction();
-}
-```
-* **并发安全保证**：`better-sqlite3` 是同步执行的驱动库，配合 WAL 模式与 `db.transaction()`，天然形成互斥锁屏障，杜绝任何异步并发引发的重复下注或负余额问题。
+同步驱动让当前单进程内的数据库操作顺序执行；WAL 不是业务级重复请求保护，也不能协调多进程各自独立的房间内存。当前架构只支持一个游戏服务实例；管理员充减没有业务请求幂等键，重复提交仍会重复入账。
 
-### 2.4 默认管理员与开局控币机制
-在 [`server/src/db/database.ts`](file:///Users/prina/Downloads/pussyGame/server/src/db/database.ts) 中，服务启动若检测到系统中无管理员，会自动插入默认管理员（账号 `admin`，初始密码 `admin123`，初始资金 `1,000,000` 筹码），并记录系统第一笔充值账本流水。后续由管理员在后台为朋友发号并分发初始筹码。
+### 2.3 资金审计与提现边界
 
----
+个人流水仅查询本人；管理员全局流水额外返回 `operatorId`、`operatorUsername`、`roomId`。旧流水无法可靠还原经办人和房间，新增字段保留 `null`；系统初始化资金同样以 `operatorId: null` 表示系统操作。时间为 SQLite `CURRENT_TIMESTAMP` 生成的 UTC 文本，通常格式为 `YYYY-MM-DD HH:MM:SS`。
 
-### 2.5 发牌配置表 (`game_settings`)
+`room_id` 不是牌局编号。同一房间多局仍缺少结构化关联，当前没有完整的牌局对账能力。开号零余额、改密、规则配置变更等非资金操作也尚无专门的管理员操作审计表。
 
-使用 `key TEXT PRIMARY KEY`、`value TEXT NOT NULL`、`updated_at DATETIME` 保存全局发牌配置，条目名为 `dealing_config_v1`。默认配置在条目不存在时提供；每次保存完整校验后使用原子更新。本局开局读取配置，后续保存只影响下一局。
+目前“充值/提现扣除”仅指管理员记录线下资金结算：正数记 `recharge`，负数记 `deduct`。没有线上支付订单、提现申请、冻结资金、付款回执或失败退款服务，不能把现有筹码流水称为线上收付款系统。
+
+### 2.4 初始化、迁移与默认管理员
+
+[database.ts](../server/src/db/database.ts) 在开启 WAL 和外键后，以同一事务完成建表、增量迁移和默认管理员的账户/初始流水创建，全部成功后才发布单例连接；失败关闭连接，不保留半初始化状态。
+
+`PRAGMA user_version = 1` 标识本次结构版本。旧库通过 `ALTER TABLE` 添加 `users.auth_version`、`ledgers.operator_id/room_id`，保留历史数据并安装同样的写入约束；未来版本高于当前服务支持范围时拒绝启动。本次审查未打开或迁移既有 `server/data/game.db`，迁移代码仅会在后续服务启动时执行，也未自动修正历史数据。
+
+默认管理员按 `ADMIN_USER` 用户名是否已存在决定是否创建，初始筹码为 1,000,000。同名账号若为普通玩家，初始化明确失败并回滚，不自动提权或覆盖账号。`ADMIN_PASS` 只在首次创建时用于密码哈希，修改环境变量不会重置既有账号密码。生产必须显式设置安全的 `JWT_SECRET/ADMIN_PASS`，不再使用仓库公开密钥和 `admin123`，启动日志不输出密码。
+
+### 2.5 发牌配置持久化
+
+`AlgorithmModel` 在条目不存在时提供默认配置；保存完整校验后以单条更新写入 `game_settings`。开局读取配置，后续保存只影响下一局。当前未保存配置修订历史或经办人。
+
+### 2.6 尚未实现的在途资金恢复
+
+**高优先级缺口**：账户及流水持久化，但开局扣款后至终局派奖前，底池和牌局状态只在内存。进程退出、容器重启或升级会清空房间，已投入筹码不会自动恢复或退款。备份数据库、启用 WAL 或原子更新单笔流水都不能解决这一问题。
+
+后续需要唯一牌局编号、每笔投入的牌局归属、可持久化的结算状态和重复执行保护；还需明确中断局采用恢复还是原子退款。本轮未擅自新增该产品规则，也未实现上述恢复链路。
 
 ## 三、 核心裁判与发牌算法
 
@@ -251,7 +226,7 @@ static changeBalance(
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │ 2. 牌局对决阶段 (gameStatus: 'playing')                │
-│    - 轮流出资 (turnSeconds 倒计时, 超时自动弃牌)       │
+│    - 轮流出资 (支持限时或无限制，限时才超时弃牌)       │
 │    - 玩家动作: 看牌 (look) / 跟注 (call) / 加注(raise) │
 │    - 发起 PK 比牌 (compare, 第 2 轮起)                 │
 │    - 弃牌 (fold, 手动或超时)                           │
@@ -275,6 +250,12 @@ static changeBalance(
 └────────────────────────────────────────────────────────┘
 ```
 
+房间没有房主字段或房主开始事件。至少两名在座玩家且全员准备时自动开局，管理员角色也不绕过准备条件。创建者仅自动进入观战席；“只有房主能开局”属于尚未采用的另一套产品规则。
+
+同账号至多归属一个房间，创建或加入另一房间前清理旧房的座位/观战身份及全部连接订阅；局中切房的离座动作按弃牌处理，不能留下两个房间的有效身份。仅最后一个连接断开时移除观战身份；座位继续保留以支持重连。等待中的离线座位目前没有自动过期回收策略。
+
+结算只接受 `playing` 状态，`settling` 时不能继续弃牌触发派奖；房间删除清理定时器且不允许直接删除进行中的房间。空房可回收，4 位房号耗尽明确报错。
+
 ### 4.2 8 人桌位模型与桌位状态机 (`TableSeat`)
 每个房间拥有固定的 `seats[8]` 数组（槽位索引 0~7），每个槽位包含如下状态：
 ```typescript
@@ -292,7 +273,7 @@ export type PlayerTableStatus =
 2. **回合轮换 (`advanceTurn`)**：
    - 过滤所有状态为 `active` 的存活座位，按座位号升序排布；
    - 寻找当前操作者顺时针方向的下一位存活者；
-   - 当顺时针跑完一整圈回到起点时，`currentRound` 轮数加 1；
+   - 记录本轮尚未行动的存活玩家；这些玩家全部完成行动后，`currentRound` 轮数加 1，不能只按座位号跨越 7→0 判断；
    - 若 `currentRound > 20`，立即中断轮换，直接触发 `maxRoundShowdown()`。
 
 ### 4.4 下注与加注计算规则
@@ -302,21 +283,26 @@ export type PlayerTableStatus =
   * **已看牌（明注）**：下注额 = `currentBet`；
   * **加注（Raise）**：玩家传入新的加注档位（必须大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
   * **全押（All-in）**：扣除玩家当前全部余额 `balance`，按 `balance / (hasLooked ? 1 : 0.5)` 折算单注。若折算值大于当前 `currentBet`，则抬高单注基准；
-* **下注特效广播**：单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（金光流幅），All-in 标记为 `specialEffect: 'allin'`（全屏震颤）。
+* **下注特效广播**：每局首次单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（全屏大金盛典与女声播报），All-in 标记为 `specialEffect: 'allin'`（全押特效）。
 
 ### 4.5 绝密比牌 (PK 对决) 机制
 1. **触发门槛**：轮到自己出牌、对局处于第 2 轮及以后、比牌对象必须同处于 `active` 存活状态；
 2. **比牌扣费**：发起方需支付比牌费用，金额为：
    $$\text{PK Cost} = \text{currentBet} \times 2 \times (\text{发起方已看牌} ? 1 : 0.5)$$
    即发起方一次跟注金额的 2 倍：闷牌为单注基准的 1 倍，明牌为 2 倍。
-3. **绝密原则**：比牌过程双方的手牌绝不对全场公开，也不向对方公开具体底牌，由裁判引擎计算后仅广播 `winnerId` 与 `loserId`；
+3. **胜者私密查看**：实际胜者可查看输者三张牌，防守获胜也适用；`game:compare_result` 遍历房间内的鉴权连接分别发送，只有胜者的连接包含 `loserCards`，其他接收者仅有公共胜负与费用。禁止把含私密牌面的对象广播到整个房间。
+   - `Room.comparisonWins` 按用户编号记录本局直接击败的玩家；不改变任何人的 `hasLooked`，不继承输者此前获得的查看权限。
+   - 后续快照、断线重连恢复及同账号多连接均按该记录授权；重置及成功开始新局时清空。未实际比牌、弃牌、无效请求或扣款失败不能授予查看权限。
+   - 比牌输者手牌不加入公共 `game:over.revealedCards`；终局原有亮牌规则保持不变。
 4. **失败者处理**：失败者状态标记为 `lost`，失去后续操作权；
 5. **胜者检查**：若淘汰后场上仅剩 1 名存活玩家，立即收官派奖。
 
 ### 4.6 倒计时控制器与断线超时防挂机
-* 每次轮到玩家操作，服务端根据房间设置的 `turnSeconds`（默认 20 秒）生成 `turnDeadline = Date.now() + turnSeconds * 1000` 并挂载 `setTimeout`；
-* 倒计时结束玩家仍未操作，服务端自动代为执行 `fold(userId, 'timeout')`，保障牌桌绝不会因为个别玩家掉线、切后台或恶意挂机而卡死；
-* 若玩家中途刷新或重连连入，倒计时不重置，客户端无缝恢复剩余倒计时。
+* 创建房间时 `turnSeconds` 默认为 20 秒；非零值继续限制在 10～60 秒，`0` 为独立的“无限制”设置，由 `RoomManager.createRoom` 原样保留。
+* 限时房间：每次轮到玩家操作，根据 `turnSeconds` 生成 `turnDeadline = Date.now() + turnSeconds * 1000` 并挂载 `setTimeout`；到期未操作时执行 `fold(userId, 'timeout')`。
+* 无限制房间：`Room.startTurnTimer` 清理旧定时器后直接返回，`turnDeadline` 始终为 `null`，不注册自动弃牌任务；开局、每次轮换及下一局均遵守该设置。
+* 刷新或重连不会重置限时房间的截止时间；无限制房间重连时仍广播 `turnSeconds: 0`、`turnDeadline: null`，保留座位和手牌，等待玩家手动操作，不因断线自动弃牌。
+* 无限制只取消回合时间限制，不改变手动弃牌、比牌、20 轮强制摊牌或结算后 4 秒重置等规则。
 
 ### 4.7 防作弊全量状态脱敏算法 (`getMaskedState`)
 为了杜绝通过浏览器控制台、抓包工具或插件窃取他人底牌作弊，服务端坚决实行**服务端定向脱敏分发**（参考 [`Room.getMaskedState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts) 与 [`Room.broadcastState`](file:///Users/prina/Downloads/pussyGame/server/src/game/Room.ts)）：
@@ -328,8 +314,10 @@ public getMaskedState(forUserId?: number): RoomState {
     return {
       ...seat,
       user: seat.user ? { ...seat.user } : null,
-      // 只有自己才能拿到非空的 cards 数组，他人一律下发 null！
-      cards: isSelf ? seat.cards : null,
+      // 仅本人及本局直接比牌胜者获准查看对应手牌。
+      cards: isSelf || (forUserId !== undefined && seat.status === 'lost' && seat.user !== null
+        && this.comparisonWins.get(forUserId)?.has(seat.user.id) === true)
+        ? seat.cards?.map(card => ({ ...card })) ?? null : null,
     };
   });
   // ... 返回脱敏后的房间状态快照
@@ -343,10 +331,12 @@ public getMaskedState(forUserId?: number): RoomState {
 WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/src/socket/`](file:///Users/prina/Downloads/pussyGame/server/src/socket/) 下组织。
 
 ### 5.1 握手鉴权与房间恢复
-* **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](file:///Users/prina/Downloads/pussyGame/server/src/utils/jwt.ts) 解析出 `userId`、`username`、`role` 并绑定至 Socket 实例，验签失败直接拒绝握手；
+* **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](file:///Users/prina/Downloads/pussyGame/server/src/utils/jwt.ts) 限定 HS256 并校验载荷、有效期和 `authVersion`，查询当前数据库用户身份后绑定至 Socket 实例；验签或凭据版本不符直接拒绝握手，每个入站事件还会再次检查；
 * **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](file:///Users/prina/Downloads/pussyGame/server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
   2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
+
+HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.auth_version`，撤销该账号已有令牌并主动断开其全部在线连接。此次升级前没有版本字段的旧令牌也会失效，需要重新登录。
 
 ### 5.2 房间与大厅信令矩阵
 | 客户端上行事件 | 参数负载 | 业务响应 / 广播下行 | 功能说明 |
@@ -366,8 +356,8 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 | `game:compare` | `{ targetPlayerId }` | Ack 回调 + 广播 `game:compare_result` | 发起绝密双人比牌 PK 对决 |
 
 ### 5.4 社交互动信令
-* `chat:emoji`：上报表情 ID，房间内全员广播 `chat:emoji_broadcast`；
-* `chat:phrase`：上报快捷短语 ID 与文本，房间内全员广播 `chat:phrase_broadcast`。
+* `chat:emoji`：表情 ID 须为非空字符串且不超过 64 字符，合法时房间内广播 `chat:emoji_broadcast`，畸形消息忽略；
+* `chat:phrase`：短语 ID 为非负安全整数、文本非空且不超过 200 字符，合法时房间内广播 `chat:phrase_broadcast`，畸形消息忽略。
 
 ---
 
@@ -417,33 +407,16 @@ if (fs.existsSync(config.clientDistPath)) {
 * **生产运行流**：前端执行 `npm run build` 生成静态文件至 `client/dist`，启动后端服务时，Express 自动托管静态资源，HTTP 接口、Socket.io 网关与前端页面全部收敛至唯一的 3000 端口（可通过 `PORT` 环境变量自定义）。
 
 ### 7.2 Docker 容器化配置
-根目录已提供完整的容器化配方：
-1. [`Dockerfile`](file:///Users/prina/Downloads/pussyGame/Dockerfile)：基于官方 `node:22-alpine` 镜像，支持 C++ 原生模块编译依赖，采用生产打包分离构建；
-2. [`docker-compose.yml`](file:///Users/prina/Downloads/pussyGame/docker-compose.yml)：
-   ```yaml
-   services:
-     pussy-game:
-       build: .
-       ports:
-         - "3000:3000"
-       environment:
-         - PORT=3000
-         - JWT_SECRET=zhajinhua-production-super-secret-key-2026
-         - DB_PATH=/app/server/data/game.db
-         - ADMIN_USER=admin
-         - ADMIN_PASS=admin123
-       volumes:
-         - game-data:/app/server/data
-   volumes:
-     game-data:
-   ```
-   * 数据库通过数据卷 `game-data` 持久化，容器重启或重建升级不丢数据。
 
----
+[Dockerfile](../Dockerfile) 基于 `node:22-alpine`，使用两端锁文件安装依赖并构建前后端，保持前端引用 `server/src/shared` 的目录关系。运行镜像包含 `server/dist`、生产依赖及 `/app/client/dist`。本轮仅静态核对配方，没有实际构建镜像。
+
+[.dockerignore](../.dockerignore) 排除宿主机依赖、构建产物、环境变量文件、数据库及其 WAL/SHM 文件，防止复制宿主机原生模块或玩家数据进镜像。
+
+[docker-compose.yml](../docker-compose.yml) 通过环境注入 `JWT_SECRET` 和 `ADMIN_PASS`，缺失时直接报错；静态目录和数据库路径均为绝对路径。`./server/data:/app/server/data` 是实际采用的目录挂载，保存账户、流水及全局配置。保留数据库不等于恢复中断牌局，见第 2.6 节。
 
 ## 八、 自动化测试与质量保障体系
 
-后端已建立高覆盖率的自动化测试套件（运行 `npm test` 自动执行全部测试）：
+2026-10-18 已执行统一检查 `npm run test:release`：双端构建成功，14 个测试文件共 291 项全部通过，生产产物冒烟检查 6/6 通过。以下为测试覆盖说明；临时旧库迁移已验证，实际玩家数据库未打开或迁移，Docker 容器镜像尚未构建验证。
 
 ### 8.1 裁判引擎全覆盖单测 (`tests/referee.test.ts`)
 * **15/15 项全部通过**：
@@ -461,10 +434,13 @@ if (fs.existsSync(config.clientDistPath)) {
   3. 看牌状态切换为明注（下注 1 倍，闷牌下注 0.5 倍）；
   4. 绝密 PK 比牌、胜负淘汰与奖池累加；
   5. 仅剩一人存活时自动结算派奖与庄家更替；
-  6. 脱敏广播：除本人外手牌强制为 null。
+  6. 开局脱敏：除本人外手牌强制为 null；比牌后的查看另按直接胜者权限执行。
 
 * 下注倍率专项测试见 `tests/betting.test.ts`：覆盖底注原额扣除、明牌 1 倍与闷牌 0.5 倍跟注、加注后的跟注、全押基准折算、比牌费用、余额与流水一致性，以及扣款失败时保留原单注基准。
 * 前端金额回归测试见 `tests/frontend-betting.test.ts`：覆盖模拟对局扣款、动作事件金额、比牌弹窗费用、按钮余额门槛与高额下注特效判定。
+* 思考时间测试见 [turn-timer.test.ts](../server/tests/turn-timer.test.ts)：模拟等待 24 小时，验证无限制房间不自动弃牌、开局及轮换没有截止时间、下一局保留设置，且限时超时弃牌与结算重置仍正常执行。
+* [frontend-betting.test.ts](../server/tests/frontend-betting.test.ts) 同时验证大厅创建设置进入模拟控制器并跨开局／操作保持，以及牌桌“无限制”显示。
+* [compare-privacy.test.ts](../server/tests/compare-privacy.test.ts) 验证发起方／被挑战方获胜授权、观战隔离、权限不继承、无效比牌、新局清空及快照副本独立；前端测试覆盖私密牌面、非胜者隐藏、模拟对局和比牌后终局弹窗顺序。
 
 ### 8.3 RESTful API 完整鉴权与账本单测 (`tests/api.test.ts`)
 * **12 项测试**：
@@ -479,15 +455,38 @@ if (fs.existsSync(config.clientDistPath)) {
 
 `tests/dealing-socket.test.ts` 自动创建临时本机服务，以两个独立鉴权客户端完成准备、私发保底牌、比牌和派奖广播。`tests/api.test.ts` 增加配置权限、持久化、错误配置拒绝及模拟草稿隔离验证。测试使用独立内存数据库，不写入既有玩家数据。
 
+[dealing-socket.test.ts](../server/tests/dealing-socket.test.ts) 还验证真实 `room:create` 收到 `turnSeconds: 0` 后，创建、开局、下注轮换和断线重连下发的房间状态均保持 `turnSeconds: 0`、`turnDeadline: null`。
+
+该联机套件同时使用四名在局玩家、一名观战者及胜者额外窗口，验证比牌事件和快照的私密牌面隔离、连胜权限不传递、重连恢复及终局战报不泄漏输者手牌。
+
 原 `tests/socket_e2e.ts` 仍是需要外部服务和指定账号的手动联调脚本；自动测试使用新脚本，不依赖该账号或固定端口。
+
+### 8.5 数据库与服务审查回归
+
+| 测试文件 | 项数 | 主要覆盖 |
+| :--- | ---: | :--- |
+| [database-integrity.test.ts](../server/tests/database-integrity.test.ts) | 39 | 旧库迁移与重开、失败初始化回滚、触发器和外键约束、内外层事务回滚、小数金额、经办人与房间归属、流水仅追加及分页 |
+| [auth-validation.test.ts](../server/tests/auth-validation.test.ts) | 84 | 输入边界、账号与权限隔离、令牌生命周期与改密撤销、资金经办人、敏感字段及存储异常脱敏、生产配置安全边界 |
+| [room-regressions.test.ts](../server/tests/room-regressions.test.ts) | 34 | 完整轮次、重复动作与重复派奖、最新钱包、金额范围、底注回滚、房间参数及公开投影 |
+| [socket-regressions.test.ts](../server/tests/socket-regressions.test.ts) | 9 | 全窗口切房、多连接断线、重连、私密手牌、改密主动断连、逐事件鉴权及畸形消息 |
+
+其余原有测试合计 125 项，包括修正完整轮次前提后的 `dealing-room.test.ts`，同时验证底池 `45÷3` 和 `50÷3` 的多人循环克制平分、扣款及流水。新增四个文件共 166 项，合计 291 项，无跳过项。
+
+`npm test` 固定测试凭据与 `DB_PATH=:memory:`；测试配置将 Vite 环境文件目录指向临时空目录，业务配置在 `NODE_ENV=test` 时跳过 `.env`。迁移测试另用自动关闭和删除的系统临时数据库，接口及联机测试监听临时本机端口，不依赖现有服务或玩家账号。
+
+[production-smoke.ts](../server/tests/production-smoke.ts) 由 `npm --prefix server run test:smoke` 执行，要求先构建。它从系统临时工作目录启动真实 `server/dist/index.js`，显式传入随机测试凭据、临时数据库和前端产物路径，检查不安全配置拒绝启动、页面与脚本托管、页面路由回退与 API 404、登录/开号/扣款/经办人审计、日志保密以及重启后的账户/余额/流水保留和不重复初始化；正常完成、失败或收到终止信号时关闭子进程并清理临时数据。
+
+资料更新、资金调整和改密仅将已知业务错误返回 400；未预期存储错误交给统一错误处理返回脱敏 500，不能向客户端回显数据库路径或 SQL 细节。测试通过不改变 [在途资金恢复缺口](#26-尚未实现的在途资金恢复) 及前端尚未接入真实服务的边界。
 
 ---
 
 ## 九、 规则进阶探索与扩展设计：爆金币赏金击杀流 (Bounty Mode)
 
+> **状态与实施约束（2026-10-18 用户确认）**：本节仅记录创想，尚未实现，短期内不计划开发，也未纳入近期开发或验收范围。以下规则、数值和参数示例均不代表已确认的实施需求或现有能力。除非用户后续明确要求启动该玩法，否则维护、审查、补齐功能和文档同步均不得被视为实施授权；不得据此新增模式参数、数据库字段、接口、页面或赏金结算逻辑。现有经典玩法继续按已实现规则维护。
+
 在规则研讨中，针对炸金花“**比牌需支付一次跟注金额的 2 倍，但比赢只能淘汰一个对手，剩下的公共大奖池反而容易被后手未参与消耗的第三方坐收渔翁之利**”的经典痛点，设计了全新的“**爆金币赏金击杀流**”创新玩法。
 
-### 9.1 核心规则设定与结算公式
+### 9.1 创想中的规则与结算公式（未实现、未排期）
 假设对局中有 A、B、C、D 四名玩家：
 1. **3 倍挑战资格**：
    - 轮到玩家 C 出牌时，C 可支付当前单注的 **3 倍** 作为挑战金（已看牌则乘 2 即 6 倍），向任意在局玩家 B 发起单挑；
@@ -507,8 +506,8 @@ if (fs.existsSync(config.clientDistPath)) {
 * **使用场景定性**：本游戏定位为好友/宿舍内部局（线下 1 元 = 10,000 游戏币，纯娱乐局），无公网黑产刷币或团队合伙套现顾虑；
 * **极度刺激的风险对冲**：B 能累积庞大下注，说明 C 同样已经投入了等量的大量筹码。C 选择支付 3 倍巨额开牌费，同样要承担比牌失败自身全部本金沉底的巨大风险；一旦比赢则能当场“爆金币回血”，极大提升了对局攻防刺激感，彻底破除“谁开谁吃亏”的僵局。
 
-### 9.3 未来服务端多模式扩展架构预留
-服务端 `Room` 状态机架构已为该玩法预留清晰的扩展接入位：
+### 9.3 概念参数示意（非现有工程预留）
+以下代码仅用于说明创想中的模式参数，不是当前源码声明。实际 `RoomOptions` 没有 `mode` 字段，服务端也没有实现或预留该玩法的模式切换、赏金账户及结算链路：
 ```typescript
 export interface RoomOptions {
   roomId: string;
@@ -518,4 +517,4 @@ export interface RoomOptions {
   mode?: 'classic' | 'bounty'; // 经典通吃流 vs 爆金币赏金击杀流
 }
 ```
-* 当后续用户希望实装该模式时，只需在房间创建参数中增加 `mode` 字段，并在 `Room.compare()` 中增加胜者 50% 现金入账与 50% 悬赏转移逻辑，即可实现双玩法自由切换。
+* 用户后续明确要求启动后，再另行评审规则、资金守恒、账本事务、协议和页面影响；本节不构成开发排期或实现承诺，不应据此提前添加实现或扩展字段。

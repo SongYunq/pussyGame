@@ -59,7 +59,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const pkCost = callAmount * 2;
   const canPK = isMyTurn && currentRound >= 2 && myBalance >= pkCost;
 
-  const raiseOptions = [10, 20, 50, 100, 500, 1000, 5000];
+  const raiseOptions = [10, 20, 50, 100, 500, 1000, 5000, 8000, 10000];
 
   return (
     <div className="w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 p-2 md:p-3 relative z-30">

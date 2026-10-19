@@ -2,6 +2,9 @@
 
 本文档旨在为**前端独立开发、Mock 联调以及后续后端实现**提供标准权威的契约规范。前后端开发严格遵循此协议。
 
+> 2026-10-18 源码核对及回归验证：14 个测试文件、291 项通过，生产产物冒烟检查 6/6 通过；覆盖范围和仍未实现的恢复能力见 [数据库与服务审查记录](database_service_review.md)。未实现接口仍在各小节明确标出。
+> **范围约束**：[爆金币赏金击杀流](backend_requirements.md#九-规则进阶探索与扩展设计爆金币赏金击杀流-bounty-mode) 尚未实现，仅作创想存档，不在近期开发或验收范围；用户后续明确要求启动前，不得据此增加页面、接口、模式参数或相关实现。
+
 发牌算法的构建规则、实现状态与变更同步要求见 [dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
 
 ---
@@ -47,7 +50,7 @@
    - **HTTP 请求**：通过 Header `Authorization: Bearer <token>` 携带。
    - **WebSocket 连接**：通过 Socket.io 初始化选项 `io({ auth: { token } })` 携带。
 3. **数据一致性原则**：
-   - 筹码变动（下注、扣除底注、胜利派发、管理员充减）**完全在服务端原子完成并持久化写入 SQLite**。
+   - 每笔筹码变动及其流水在服务端同一数据库事务中提交；整桌底注批扣和多人派奖分别有外层事务。**房间与在途底池未持久化，进程重启不能恢复或自动退款**，不能将单笔原子性理解为整局资金恢复保证。
    - 前端接收到操作成功广播后更新视图，断线重连一律以服务端下发的最新全量 `room:state` 快照为准。
 
 ---
@@ -69,8 +72,18 @@ interface ApiResponse<T = any> {
 * `400`: 请求参数校验失败 (Bad Request)
 * `401`: 未登录或 Token 已过期 (Unauthorized)
 * `403`: 权限不足（非管理员尝试调用后台 API）(Forbidden)
-* `404`: 资源不存在（房间未找到 / 用户不存在）
-* `500`: 服务器内部错误
+* `404`: HTTP 接口路径不存在或对应功能尚未实现
+* `500`: 服务器内部错误，响应不得回显数据库路径、SQL、堆栈或凭据
+
+### 通用参数与会话约束（已实现）
+
+- 登录用户名为去首尾空格后 1～64 字符；登录密码非空且 UTF-8 不超过 72 字节。新建及重置密码至少 6 字符、不全为空白、不含 NUL，且 UTF-8 不超过 72 字节。
+- 昵称去首尾空格后 1～40 字符，头像标识 1～256 字符；上述文本拒绝控制字符。修改资料至少提供昵称或头像之一；未提供的字段保留原值。
+- 初始筹码是非负有限数；充值/扣减是非零有限数，金额绝对值及结果余额不超过 `Number.MAX_SAFE_INTEGER`，余额不能为负。保留现有小数筹码；管理员原因可省略，为文本时最多 500 字符且不得含控制字符，空白原因使用服务端默认描述。
+- 分页 `page` 为正整数，`pageSize` 为 1～100 的整数，偏移量也必须是安全整数；拒绝小数、负数、混合字符串、数组。省略时个人流水默认 1/20，全局流水默认 1/50。路径用户编号为正安全整数。
+- 请求体格式或参数错误返回 400；未知 `/api` 路径返回统一 404 JSON，不能返回前端页面冒充接口成功。
+- 资料更新、充值/扣减和改密的已知业务拒绝返回 400；未预期存储错误统一返回脱敏 500，不伪装成用户输入错误。响应格式仍为 `{ code, message, data }`。
+- JWT 使用 HS256 且有效期 7 天；载荷包含 `authVersion`，每次鉴权比较数据库当前凭据版本，管理员权限以数据库当前角色为准。重置密码递增版本并主动断开该账号所有在线连接；旧令牌及本次升级前无版本字段的令牌均需重新登录。
 
 ---
 
@@ -187,10 +200,11 @@ interface ApiResponse<T = any> {
 ---
 
 ### 3.3 超级管理员后台专区 (`/api/admin`)
-*提示：以下接口必须验证当前用户的 JWT 具备 `role: "admin"` 权限。*
+*提示：以下已实现接口必须通过 JWT 验证并确认数据库当前用户为管理员；令牌内的历史角色不能覆盖当前数据库角色。*
 
 #### 1. 管理员开通新用户账号
 * **路径**：`POST /api/admin/users`
+* **身份边界**：当前只开通 `player` 账号；即使请求带有 `role/isBanned` 也不会实现授权或封禁，这些管理功能尚未接入。
 * **请求体**：
 ```json
 {
@@ -228,6 +242,7 @@ interface ApiResponse<T = any> {
       "nickname": "绝世赌神张三",
       "avatar": "avatar_1.png",
       "balance": 11600,
+      "role": "player",
       "isOnline": true,
       "currentRoomId": "8888",
       "createdAt": "2026-10-13T18:00:00.000Z"
@@ -238,6 +253,7 @@ interface ApiResponse<T = any> {
       "nickname": "李四",
       "avatar": "avatar_2.png",
       "balance": 5000,
+      "role": "player",
       "isOnline": false,
       "currentRoomId": null,
       "createdAt": "2026-10-13T19:30:00.000Z"
@@ -285,11 +301,15 @@ interface ApiResponse<T = any> {
 
 #### 5. 获取全局审计流水日志
 * **路径**：`GET /api/admin/audit-logs?page=1&pageSize=50`
-* **响应数据**：返回包括管理员充减、对局赢家胜出等在内的全局所有资金变动记录。
+* **响应数据**：`{ code: 200, message: "ok", data: { list, total } }`。`list` 包含个人流水字段，以及 `userId/username/nickname/operatorId/operatorUsername/roomId`。经办人从鉴权身份记录，不能由请求伪造；系统初始化与旧历史未知经办人用 `null`，旧流水未知房间也用 `null`。
+* 当前是资金流水审计；不包含改密、零余额开号、封禁或规则配置修订等通用操作审计。`roomId` 不等于唯一牌局编号。
+* `createdAt` 返回 SQLite UTC 时间文本（通常 `YYYY-MM-DD HH:MM:SS`），不保证为 ISO 8601。
 
-#### 6. 删除玩家账号
+#### 6. 删除玩家账号（待实现）
+
+> 以下是预留设计，没有后端路由或完整数据库支持；所列成功响应仅为目标契约，当前调用返回 404。
 * **路径**：`DELETE /api/admin/users/:id`
-* **说明**：管理员删除玩家账号及其关联对局资产记录（主管理员 `admin` 禁止删除）。
+* **待确定**：删除或停用账户的政策尚需明确。现有资金流水仅允许追加，不能直接以删除关联资金记录作为安全删除方案。
 * **响应数据**：
 ```json
 {
@@ -298,7 +318,9 @@ interface ApiResponse<T = any> {
 }
 ```
 
-#### 7. 编辑玩家账号资料与权限
+#### 7. 编辑玩家账号资料与权限（待实现）
+
+> 以下是预留设计，没有后端路由或完整数据库支持；所列成功响应仅为目标契约，当前调用返回 404。
 * **路径**：`PUT /api/admin/users/:id`
 * **请求体**：
 ```json
@@ -325,7 +347,9 @@ interface ApiResponse<T = any> {
 }
 ```
 
-#### 8. 获取充值与调账流水专账记录
+#### 8. 获取充值与调账流水专账记录（待实现）
+
+> 以下是预留设计，没有后端路由或完整数据库支持；所列成功响应仅为目标契约，当前调用返回 404。
 * **路径**：`GET /api/admin/chips/logs?page=1&pageSize=50`
 * **响应数据**：
 ```json
@@ -350,6 +374,8 @@ interface ApiResponse<T = any> {
   }
 }
 ```
+
+当前没有线上充值订单或提现申请接口。`POST /admin/users/:id/chips` 的负数仅代表管理员记录线下扣减，不包含资金冻结、实际付款或失败退款。
 
 #### 9. 获取当前发牌配置
 
@@ -473,6 +499,8 @@ const socket = io("http://localhost:3000", {
 });
 ```
 
+握手和每个入站事件都会验证令牌和当前凭据版本；失败拒绝连接或通过回调/`error` 返回 401 后断开。改密成功会主动断开全部旧连接。同账号多连接共享一个房间归属，只断开一个窗口不会删除仍在线的观战身份。重连恢复仅在服务进程仍持有房间内存时有效，不能跨服务重启恢复。
+
 #### 异常断开与错误事件：`error`
 ```json
 {
@@ -492,19 +520,23 @@ const socket = io("http://localhost:3000", {
 {
   "roomName": "老友聚会局",
   "baseAnte": 10,             // 底注（例如 10 筹码）
-  "turnSeconds": 20           // 房主自定义思考倒计时（秒），如 15/20/30/60
+  "turnSeconds": 20           // 每轮思考时间（秒）：15/20/30/60；0 表示无限制；省略时默认 20
 }
 ```
+* **参数校验**：`roomName` 必须为字符串，去首尾空格后为空则采用默认房名；`baseAnte` 须为正有限数且十倍不超过安全整数上限，现有最小底注仍取 1；`turnSeconds` 必须为整数。创建的房号为 4 位数字，可用房号耗尽时返回 400。
+* **房间归属**：同账号只属于一个房间。创建/加入新房时自动离开旧房，局中离座按弃牌处理，同账号全部在线连接一起切换订阅；加入同房间保留原座位。
+* **思考时间契约**：`turnSeconds = 0` 明确表示无限制，服务端必须保留该值，不得回退为默认值或下限。非零值继续按 10～60 秒截取；未提供时默认 20 秒。
+* **无限制房间**：开局及每次轮换后，`room:state.turnSeconds` 为 `0`、`turnDeadline` 为 `null`；不注册回合超时任务，不因等待时间或断线自动弃牌。手动下注、弃牌、比牌及 20 轮上限仍按现有规则执行。
 * **服务端响应回调**：`{ code: 200, roomId: "8888" }`，同时该客户端自动加入该房间，并触发全量 `room:state` 广播。
 
 #### 2. 加入房间
 * **客户端发出**：`room:join`
-* **入参**：`{ "roomId": "8888" }`
+* **入参**：`{ "roomId": "8888" }`，须为 4～6 位数字字符串；找不到返回 404。
 * **说明**：玩家通过输入 4~6 位房间码或点击分享链接入房。进入后默认为**观战席**。
 
 #### 3. 选座坐下
 * **客户端发出**：`room:sit`
-* **入参**：`{ "seatIndex": 0 }` (0~7，最多 8 个物理桌位)
+* **入参**：`{ "seatIndex": 0 }` (0~7 的整数，最多 8 个物理桌位)
 * **业务逻辑**：如果该座位空闲且当前玩家筹码大于等于 `baseAnte * 10`，入座成功，状态变为待准备。
 
 #### 4. 离开座位 (站起变为观战)
@@ -514,7 +546,8 @@ const socket = io("http://localhost:3000", {
 
 #### 5. 准备 / 取消准备
 * **客户端发出**：`room:ready`
-* **入参**：`{ "isReady": true }`
+* **入参**：`{ "isReady": true }`，只接受布尔值。
+* **开局权限**：至少两名在座玩家且全员准备后自动开局。当前没有房主字段、房主强制开局或手动开始信令，管理员也无绕过准备的开局接口。
 
 #### 6. 核心全量房间状态广播：`room:state` (服务端推全桌)
 每当房间有人进出、换座、准备、开局、下注、轮转时，服务端均会广播此快照（客户端根据此状态做 100% 确定性渲染）：
@@ -525,11 +558,11 @@ const socket = io("http://localhost:3000", {
   "deckKind": "standard", // 本局牌库类型，贯穿比牌与结算
   "roomName": "老友聚会局",
   "baseAnte": 10,
-  "turnSeconds": 20,
+  "turnSeconds": 20,      // 0 表示思考时间无限制
   "gameStatus": "playing", // "waiting" (等待开局) | "playing" (游戏中) | "settling" (结算中)
   "currentRound": 3,      // 当前对局进行到第几轮 (上限 20 轮)
   "currentTurnPlayerId": 1, // 当前该谁操作
-  "turnDeadline": 1799889920000, // 倒计时截止时间戳 (前端做本地进度条与倒数)
+  "turnDeadline": 1799889920000, // 倒计时截止时间戳；无限制或无进行中回合时为 null
   "currentBet": 20,       // 当前明牌单注基准（明牌下注 20，闷牌下注 10；开局底注另按 baseAnte 扣除）
   "totalPot": 380,        // 桌面中央奖池总筹码
   "dealerSeatIndex": 0,   // 庄家座位索引
@@ -544,7 +577,7 @@ const socket = io("http://localhost:3000", {
       },
       "status": "active", // "empty" | "sitting" | "ready" | "active" (在局中) | "folded" (已弃牌) | "lost" (比牌淘汰)
       "hasLooked": true,  // 是否已看牌 (明注)
-      "cards": [          // 重点：仅本人可查看到自己的底牌对象，其他人的 cards 均为 null
+      "cards": [          // 本人及本局直接比牌胜者可见对应底牌，其余视角为 null
         { "suit": "spades", "rank": 14 },
         { "suit": "hearts", "rank": 14 },
         { "suit": "diamonds", "rank": 14 }
@@ -562,7 +595,7 @@ const socket = io("http://localhost:3000", {
       },
       "status": "active",
       "hasLooked": false,
-      "cards": null,      // 他人手牌严密屏蔽
+      "cards": null,      // 默认隐藏他人手牌；本局直接比牌胜者可取得其击败玩家的三张牌
       "currentInvested": 30,
       "isReady": true
     }
@@ -578,7 +611,7 @@ const socket = io("http://localhost:3000", {
 ### 4.3 炸金花牌局流转信令 (Game Flow)
 
 #### 1. 开局通知：`game:start` (服务端广播)
-当在座准备人数 ≥ 2 且全部就绪（或房主点击开始）时触发：
+当在座玩家 ≥ 2 且全员准备时自动触发；没有房主点击开始的实际链路：
 ```json
 {
   "round": 1,
@@ -611,10 +644,11 @@ const socket = io("http://localhost:3000", {
 ```json
 {
   "actionType": "raise", // "call" (跟注) | "raise" (加注) | "allin" (全押)
-  "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 1000 | 5000 | "allin"
+  "chipOption": 50,     // 档位值: 10 | 20 | 50 | 100 | 500 | 1000 | 5000 | 8000 | 10000 | "allin"
   "amount": 50          // 可选；实际扣款由服务端按明牌 1 倍、闷牌 0.5 倍计算，不信任客户端金额
 }
 ```
+* **校验与余额**：只接受 `call/raise/allin` 三类动作，未知动作不能免费推进回合；下注和比牌以数据库当前余额为准，全押读取实时余额。金额、单注基准、累计投入和奖池必须在有效数值范围内，扣款成功才更新金额状态。当前全押没有边池或免后续跟注状态，完整全押规则仍待确定。
 * **服务端广播**：`game:player_bet` (触发筹码飞入底池动效)
 ```json
 {
@@ -624,7 +658,7 @@ const socket = io("http://localhost:3000", {
   "amount": 50,
   "totalPot": 430,
   "playerBalance": 9750,
-  "specialEffect": null // "none" | "gold" (5000+ 专属金光) | "allin" (All-in 全场震颤雷电)
+  "specialEffect": null // "none" | "gold" (本局首次 5000+ 全屏大金盛典与女声播报) | "allin" (All-in 全押特效)
 }
 ```
 
@@ -652,8 +686,8 @@ const socket = io("http://localhost:3000", {
 }
 ```
 
-#### 2. 比牌决斗结果广播：`game:compare_result` (服务端向全桌广播)
-> **绝密悬念原则**：决斗碰撞动画播放后，全桌任何人（包括旁观者与对决者自身）均**不公开彼此底牌**，仅公布裁决输赢，败者扣牌出局！
+#### 2. 比牌决斗结果：`game:compare_result` (服务端按接收者分别下发)
+> **胜者私密查看**：胜负、费用和底池发给全桌；仅实际胜者的事件附带 `loserCards`。输者、其余玩家及观战者收到的事件不包含该字段。胜者不论是发起方还是被挑战方，均可查看输者三张牌；查看不会自动将胜者自己的手牌设为已看牌。
 
 ```json
 {
@@ -665,7 +699,19 @@ const socket = io("http://localhost:3000", {
   "totalPot": 530
 }
 ```
-*前端动效表现*：屏幕中央出现两人头像的 1v1 烈焰雷霆对撞动画，随后 `loserId` 玩家头像变灰并打上“淘汰/败”印章。
+仅向上述例子的玩家 1 附加：
+```json
+{
+  "loserCards": [
+    { "suit": "spades", "rank": 10 },
+    { "suit": "hearts", "rank": 10 },
+    { "suit": "clubs", "rank": 8 }
+  ]
+}
+```
+* **快照与重连**：服务端按本局实际比牌记录维护查看权限。胜者后续收到的 `room:state.seats[*].cards` 可包含其直接击败且仍在座位上的输者手牌；除输者本人外，其他未获授权者的该座位仍为 `null`。权限不经后续胜负传递，重置房间或新局开始时清空。
+* **终局隔离**：`game:over.revealedCards` 保持原有终局亮牌规则，不添加比牌输者的私密手牌。
+* **前端动效**：对撞后，胜者在比牌弹窗看到输者三张牌及“仅你可见”提示；其他人仍看到牌背。比牌弹窗关闭后再显示终局战报，胜者也可在当前局牌桌查看已获授权的输者牌面，但牌桌不再附加“仅你可见”等小字。
 
 #### 3. 单局终局结算：`game:over`
 
@@ -700,7 +746,7 @@ const socket = io("http://localhost:3000", {
 
 #### 1. 发送快捷表情
 * **客户端发出**：`chat:emoji`
-* **入参**：`{ "emojiId": "fire" }` (如: `cool`, `fire`, `sweat`, `skull`, `money`, `cry`)
+* **入参**：`{ "emojiId": "fire" }` (如: `cool`, `fire`, `sweat`, `skull`, `money`, `cry`)，须为非空字符串且不超过 64 字符；畸形消息忽略。
 * **服务端广播**：`chat:emoji_broadcast`
 ```json
 {
@@ -712,7 +758,7 @@ const socket = io("http://localhost:3000", {
 
 #### 2. 发送快捷短语
 * **客户端发出**：`chat:phrase`
-* **入参**：`{ "phraseId": 3, "text": "快点吧，我等到花儿都谢了！" }`
+* **入参**：`{ "phraseId": 3, "text": "快点吧，我等到花儿都谢了！" }`，编号为非负安全整数，文本非空且不超过 200 字符；畸形消息忽略。
 * **服务端广播**：`chat:phrase_broadcast`，在头像侧边弹出气泡文本框。
 
 ---
@@ -761,7 +807,7 @@ export interface TableSeat {
   } | null;
   status: PlayerTableStatus;
   hasLooked: boolean;
-  cards: Card[] | null;     // 仅本人可见具体牌面，他人为 null
+  cards: Card[] | null;     // 本人手牌，或本局直接比牌胜者获准查看的输者手牌；其余为 null
   currentInvested: number;  // 本局已下注金额
   isReady: boolean;
 }
@@ -772,7 +818,7 @@ export interface RoomState {
   roomName: string;
   deckKind: 'standard' | 'short';
   baseAnte: number;
-  turnSeconds: number;
+  turnSeconds: number; // 0 表示无限制，默认 20；非零为 10～60 秒
   gameStatus: 'waiting' | 'playing' | 'settling';
   currentRound: number;
   currentTurnPlayerId: number | null;

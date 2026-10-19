@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+server/data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
+**/coverage
+**/*.log
+**/.DS_Store

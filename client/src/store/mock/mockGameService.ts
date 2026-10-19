@@ -94,7 +94,10 @@ export interface MockBetNotification {
   actionType: 'call' | 'raise' | 'allin';
   chipValue: number;
   actualAmount: number;
+  isDevTool?: boolean;
 }
+
+export type MockRoomOptions = Pick<RoomState, 'roomName' | 'baseAnte' | 'turnSeconds'>;
 
 /**
  * 纯前端 Mock 游戏控制器
@@ -106,6 +109,7 @@ export class MockGameController {
   private onPlayerBet?: (event: MockBetNotification) => void;
   private lastSettlement: GameOverEvent | null = null;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
+  private hasTriggeredGoldInHand: boolean = false;
 
   constructor(
     onStateChange: (state: RoomState) => void,
@@ -136,12 +140,31 @@ export class MockGameController {
   }
 
   /**
+   * 创建本地房间，将大厅设置保存在模拟控制器中。
+   */
+  public createRoom(options: MockRoomOptions): string {
+    this.clearBotTimer();
+    this.secretCards.clear();
+    this.lastSettlement = null;
+    this.hasTriggeredGoldInHand = false;
+    this.state = {
+      ...createInitialMockRoom(this.state.seats.filter((seat) => seat?.user).length),
+      ...options,
+      roomId: Math.floor(1000 + Math.random() * 9000).toString(),
+      currentBet: options.baseAnte,
+    };
+    this.onStateChange(this.state);
+    return this.state.roomId;
+  }
+
+  /**
    * 重设在座人数 (2~8 人) 测试自适应桌位排布
    */
   public setSeatCount(count: number) {
     this.clearBotTimer();
     this.state = createInitialMockRoom(count);
     this.secretCards.clear();
+    this.hasTriggeredGoldInHand = false;
     this.onStateChange(this.state);
   }
 
@@ -155,6 +178,7 @@ export class MockGameController {
     let handIndex = 0;
     this.lastSettlement = null;
     this.secretCards.clear();
+    this.hasTriggeredGoldInHand = false;
 
     sound.playDealCard();
 
@@ -165,7 +189,7 @@ export class MockGameController {
       draft.currentBet = draft.baseAnte;
       draft.totalPot = 0;
       draft.currentTurnPlayerId = MOCK_ME.id;
-      draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
+      draft.turnDeadline = draft.turnSeconds === 0 ? null : Date.now() + draft.turnSeconds * 1000;
 
       draft.seats.forEach((seat) => {
         if (seat && seat.user) {
@@ -246,11 +270,19 @@ export class MockGameController {
       }
     });
 
-    if (notification && this.onPlayerBet) {
-      this.onPlayerBet(notification);
+    let isFirstGold = false;
+    if (notification) {
+      const betInfo = notification as MockBetNotification;
+      if (betInfo.actionType !== 'allin' && betInfo.actualAmount >= 5000 && !this.hasTriggeredGoldInHand) {
+        this.hasTriggeredGoldInHand = true;
+        isFirstGold = true;
+      }
+      if (this.onPlayerBet) {
+        this.onPlayerBet(betInfo);
+      }
     }
 
-    this.scheduleBotTurnIfNeeded();
+    this.scheduleBotTurnIfNeeded(isFirstGold ? 4300 : 1150);
   }
 
   /**
@@ -288,7 +320,7 @@ export class MockGameController {
       const displayAmount =
         actionType === 'allin'
           ? 5000
-          : targetSeat.hasLooked
+          : chipValue >= 5000 || targetSeat.hasLooked
             ? chipValue
             : chipValue * 0.5;
 
@@ -300,6 +332,7 @@ export class MockGameController {
         actionType,
         chipValue,
         actualAmount: displayAmount,
+        isDevTool: true,
       };
     });
 
@@ -326,7 +359,7 @@ export class MockGameController {
   /**
    * 发起比牌 PK
    */
-  public compare(initiatorId: number, targetId: number): { winnerId: number; loserId: number } {
+  public compare(initiatorId: number, targetId: number): { winnerId: number; loserId: number; loserCards?: Card[] } {
     this.clearBotTimer();
     sound.playPKClash();
 
@@ -355,13 +388,20 @@ export class MockGameController {
       const loserSeat = draft.seats.find((s) => s?.user?.id === loserId);
       if (loserSeat) {
         loserSeat.status = 'lost';
+        if (winnerId === MOCK_ME.id) {
+          loserSeat.cards = this.secretCards.get(loserId)!.map(card => ({ ...card }));
+        }
       }
 
       this.checkWinnerOrAdvance(draft);
     });
 
     this.scheduleBotTurnIfNeeded();
-    return { winnerId, loserId };
+    return {
+      winnerId,
+      loserId,
+      ...(winnerId === MOCK_ME.id ? { loserCards: this.secretCards.get(loserId)!.map(card => ({ ...card })) } : {}),
+    };
   }
 
   /**
@@ -418,10 +458,10 @@ export class MockGameController {
     }
 
     draft.currentTurnPlayerId = draft.seats[nextIndex]!.user!.id;
-    draft.turnDeadline = Date.now() + draft.turnSeconds * 1000;
+    draft.turnDeadline = draft.turnSeconds === 0 ? null : Date.now() + draft.turnSeconds * 1000;
   }
 
-  private scheduleBotTurnIfNeeded() {
+  private scheduleBotTurnIfNeeded(delayMs = 1150) {
     this.clearBotTimer();
     if (this.state.gameStatus !== 'playing') return;
 
@@ -452,7 +492,7 @@ export class MockGameController {
       } else {
         this.bet(botId, 'call', this.state.currentBet);
       }
-    }, 1150);
+    }, delayMs);
   }
 
   private checkWinnerOrAdvance(draft: RoomState) {

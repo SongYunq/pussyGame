@@ -61,3 +61,182 @@
   opacity: 0;
   animation: chip-drop-in 160ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+
+/* All-in 顶部横幅进退场生命周期动画 (2000ms) */
+@keyframes allin-banner-lifecycle {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px) scale(0.88);
+    filter: brightness(1.6) blur(4px);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.03);
+    filter: brightness(1.15) blur(0px);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1) blur(0px);
+  }
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1) blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.95);
+    filter: brightness(0.9) blur(2px);
+  }
+}
+
+/* All-in 全屏四周暗角与流光边缘呼吸生命周期 */
+@keyframes allin-vignette-lifecycle {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.72;
+  }
+  65% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* All-in 横幅表面高光扫掠 */
+@keyframes allin-sheen-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-25deg);
+  }
+  45%, 100% {
+    transform: translateX(260%) skewX(-25deg);
+  }
+}
+
+/* All-in 两侧火星粒子升腾 */
+@keyframes allin-ember-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) translateX(0) scale(0.4);
+  }
+  25% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-220px) translateX(var(--ember-drift, 18px)) scale(1.15);
+  }
+}
+
+.animate-allin-banner {
+  animation: allin-banner-lifecycle 2000ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-allin-vignette {
+  animation: allin-vignette-lifecycle 2000ms ease-out forwards;
+}
+
+.animate-allin-sheen {
+  animation: allin-sheen-sweep 1400ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.animate-allin-ember {
+  animation: allin-ember-rise var(--ember-duration, 1600ms) ease-out forwards;
+}
+
+/* 首次 5000+ 全屏大金盛典遮罩生命周期 (3600ms) */
+@keyframes gold-fullscreen-backdrop {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 首次 5000+ 全屏大金中央主舞台进退场 (3600ms) */
+@keyframes gold-fullscreen-stage {
+  0% {
+    opacity: 0;
+    transform: scale(0.65) translateY(24px);
+    filter: brightness(1.8) blur(6px);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-4px);
+    filter: brightness(1.2) blur(0px);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1) blur(0px);
+  }
+  86% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1) blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-16px);
+    filter: brightness(0.9) blur(4px);
+  }
+}
+
+/* 皇家太阳放射光芒缓慢旋转 */
+@keyframes gold-rays-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(90deg) scale(1.08);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(180deg) scale(1);
+  }
+}
+
+/* 全屏大金锁定倒计时进度条 */
+@keyframes gold-lock-progress {
+  0% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+.animate-gold-backdrop {
+  animation: gold-fullscreen-backdrop 4200ms ease-out forwards;
+}
+
+.animate-gold-stage {
+  animation: gold-fullscreen-stage 4200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-gold-rays {
+  animation: gold-rays-spin 10s linear infinite;
+}
+
+.animate-gold-progress {
+  animation: gold-lock-progress 4100ms linear forwards;
+}
+
+
+

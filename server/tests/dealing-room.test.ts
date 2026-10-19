@@ -68,19 +68,36 @@ describe('Room algorithm integration and atomic payouts', () => {
     expect(getDb().prepare("SELECT COUNT(*) AS count FROM ledgers WHERE type = 'ante'").get()).toEqual(ledgerCount);
   });
 
-  it('shares a cyclic showdown pot among live players and writes one payout per player', () => {
+  it.each([false, true])('shares a cyclic showdown pot atomically, including fractional thirds, seen=%s', (seen) => {
     const config = defaultAlgorithmConfig(); config.deckProbabilities = { standard: 100, short: 0 }; config.standardModes = { random: 100, rival: 0, guarantee: 0 };
     AlgorithmModel.saveConfig(config);
     const room = roomWithPlayers(); ready(room);
     room.seats[0]!.cards = [{ rank: 14, suit: 'spades' }, { rank: 14, suit: 'hearts' }, { rank: 14, suit: 'clubs' }];
     room.seats[1]!.cards = [{ rank: 2, suit: 'spades' }, { rank: 3, suit: 'clubs' }, { rank: 5, suit: 'hearts' }];
     room.seats[2]!.cards = [{ rank: 6, suit: 'diamonds' }, { rank: 9, suit: 'diamonds' }, { rank: 13, suit: 'diamonds' }];
-    room.currentRound = 20; room.currentTurnPlayerId = ids[2];
-    room.bet(ids[2], 'call', 10);
+    if (seen) room.lookCards(ids[0]);
+    const marker = (getDb().prepare('SELECT MAX(id) AS id FROM ledgers').get() as { id: number }).id;
+    room.currentRound = 20;
+    room.bet(room.currentTurnPlayerId!, 'call', 10);
+    expect(room.gameStatus).toBe('playing');
+    room.bet(room.currentTurnPlayerId!, 'call', 10);
+    expect(room.gameStatus).toBe('playing');
+    room.bet(room.currentTurnPlayerId!, 'call', 10);
     expect(room.gameStatus).toBe('settling');
-    ids.forEach((id, index) => expect(UserModel.findById(id)!.balance).toBeCloseTo(990 - (index === 2 ? 5 : 0) + 35 / 3, 8));
-    const rows = getDb().prepare("SELECT amount FROM ledgers WHERE type = 'game_win'").all() as { amount: number }[];
+    const pot = seen ? 50 : 45;
+    ids.forEach((id, index) => {
+      const payment = seen && index === 0 ? 10 : 5;
+      expect(UserModel.findById(id)!.balance).toBeCloseTo(990 - payment + pot / 3, 8);
+    });
+    const debits = getDb().prepare("SELECT user_id, amount FROM ledgers WHERE id > ? AND type = 'bet' ORDER BY id").all(marker);
+    expect(debits).toEqual([
+      { user_id: ids[1], amount: -5 },
+      { user_id: ids[2], amount: -5 },
+      { user_id: ids[0], amount: seen ? -10 : -5 },
+    ]);
+    const rows = getDb().prepare("SELECT amount FROM ledgers WHERE id > ? AND type = 'game_win' ORDER BY id").all(marker) as { amount: number }[];
     expect(rows).toHaveLength(3);
-    expect(rows.reduce((sum, row) => sum + row.amount, 0)).toBe(35);
+    rows.forEach(row => expect(row.amount).toBeCloseTo(pot / 3, 8));
+    expect(rows.reduce((sum, row) => sum + row.amount, 0)).toBe(pot);
   });
 });

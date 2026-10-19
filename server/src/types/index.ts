@@ -22,9 +22,19 @@ export interface TableSeat {
   } | null;
   status: PlayerTableStatus;
   hasLooked: boolean;
-  cards: Card[] | null;     // 仅本人可见具体牌面，他人为 null
+  cards: Card[] | null;     // 本人或本局直接比牌胜者可见，其余视角为 null
   currentInvested: number;  // 本局已下注金额
   isReady: boolean;
+}
+
+export interface CompareResultEvent {
+  initiatorId: number;
+  targetId: number;
+  winnerId: number;
+  loserId: number;
+  cost: number;
+  totalPot: number;
+  loserCards?: Card[]; // 仅向本次比牌胜者下发
 }
 
 // 房间全量状态
@@ -33,7 +43,7 @@ export interface RoomState {
   roomName: string;
   deckKind: DeckKind;
   baseAnte: number;
-  turnSeconds: number;
+  turnSeconds: number; // 0 表示思考时间无限制
   gameStatus: 'waiting' | 'playing' | 'settling';
   currentRound: number;
   currentTurnPlayerId: number | null;
@@ -50,6 +60,7 @@ export interface UserRecord {
   id: number;
   username: string;
   password_hash: string;
+  auth_version: number;
   nickname: string;
   avatar: string;
   balance: number;
@@ -81,4 +92,5 @@ export interface JwtPayload {
   userId: number;
   username: string;
   role: 'player' | 'admin';
+  authVersion?: number;
 }

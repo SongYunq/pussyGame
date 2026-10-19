@@ -3,6 +3,8 @@
 > **文档定位与说明**：本文档基于当前前端工程源码（`client/`）进行全面梳理与标准更新，涵盖架构设计、页面视图流转、第一人称自适应排座算法、3D 卡牌手感、2.5D 拟真筹码堆叠动效、Web Audio 振荡器音频合成引擎、防作弊绝密比牌机制、管理员多维管控中枢及双模驱动（Mock 独立演示 / Socket.io 实时信令）实现规范。
 > 接口契约参考：[api_specification.md](file:///Users/prina/Downloads/pussyGame/docs/api_specification.md)；服务端规范参考：[backend_requirements.md](file:///Users/prina/Downloads/pussyGame/docs/backend_requirements.md)。
 > 发牌算法规则、实际接入状态与变更同步要求统一见：[dealing_algorithm_requirements.md](dealing_algorithm_requirements.md)。
+> **2026-10-18 验证**：双端构建、14 个文件共 291 项测试及 6 项生产产物冒烟检查通过，包含前端金额/隐私逻辑和真实页面静态托管；未进行浏览器全流程验收，管理页与流水抽屉的模拟数据边界仍然存在。详情见 [数据库与服务审查记录](database_service_review.md)。资料、资金和改密接口的未预期存储错误返回脱敏 500，前端只有收到业务成功后才能展示操作成功。
+> **范围约束**：[爆金币赏金击杀流](backend_requirements.md#九-规则进阶探索与扩展设计爆金币赏金击杀流-bounty-mode) 尚未实现，仅作创想存档，不在近期开发或验收范围；用户后续明确要求启动前，不得据此增加页面、接口、模式参数或相关实现。
 
 ---
 
@@ -37,7 +39,7 @@ App 视图流转体系
 ├── 2. 游戏大厅视图 (LobbyView)
 │    ├── 个人资料与钱包筹码即时展示
 │    ├── 快捷房间号检索加入（4~6位房间号）
-│    ├── 自定义开辟房间（房间名、底注 10/20/50/100、思考倒计时 15/20/30/60s）
+│    ├── 自定义开辟房间（房间名、底注 10/20/50/100、思考时间 15/20/30/60s 或无限制）
 │    └── 牌型权重与特殊 235 裁判规则图解弹窗
 ├── 3. 游戏桌面核心视图 (TableView)
 │    ├── 顶部信息栏（房号、底注、思考时间、静音切换、账本入口、个人筹码）
@@ -45,7 +47,7 @@ App 视图流转体系
 │    ├── 底部交互面板 (ActionPanel)：看牌、弃牌、比牌、跟注、加注抽屉、梭哈、表情/短语
 │    ├── 专属动效与特写层：PK 绝密对决弹窗、All-in 屏幕雷电震颤、5000+ 金光流幅、终局结算卡片
 │    └── 左下角纯前端 Mock 调测驱动台 (DevToolBar)
-├── 4. 房主/管理员后台 (AdminDashboard)
+├── 4. 管理员后台 (AdminDashboard)
 │    ├── 角色权限物理隔离（管理员账号登录强制锁定管理端，隔离牌桌）
 │    ├── 账号管理子系统：检索、多状态筛选、开通新账号、重置密码、修改资料/封禁、安全删除
 │    ├── 充值与资金子系统：快速充减筹码、流水明细溯源、全流通筹码统计
@@ -55,6 +57,13 @@ App 视图流转体系
 ```
 
 ---
+
+### 2.1 创建房间与思考时间（2026-10-18）
+
+* 创建弹窗使用“每轮思考时间”，提供 `15s / 20s / 30s / 60s / 无限制` 五个选项，默认保持 `20s`；无限制用数值 `0` 表达。
+* 选择无限制时提示“不设倒计时，不会因超时自动弃牌”；牌桌顶部显示“思考: 无限制”，不显示 `0s`。
+* 已实现的大厅创建流程由本地模拟控制器创建并保存完整房间设置；开局、看牌、下注和轮换不会恢复旧的思考时间。模拟状态在无限制下始终使用 `turnDeadline: null`，机器人仍按原有节奏主动操作。
+* 联机服务端的 `room:create` 与房间状态广播支持同一 `0 / null` 契约；客户端已有 `SocketService` 信令方法。当前 `LobbyView` 及牌桌动作仍使用本地模拟流程，完整联机页面接入属于待实现，不能将本地创建描述为已经完成多人联机。
 
 ## 三、 牌桌核心交互与视觉动效规范
 
@@ -104,15 +113,17 @@ App 视图流转体系
   * **性能与防爆炸熔断**：单人面前最多保留 15 摞筹码或累计 60,000 筹码，全桌上限 75 摞或 250,000 底池，超出阈值平滑转为静默数字累加。
 
 ### 3.4 专属震撼高潮特效
-1. **5000+ 高额加注金色流幅 ([GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx))**：
-   * 当单次下注金额 $\ge 5000$ 时触发；
-   * 屏幕上方弹出金光离子横幅：“豪气冲天 · 大额加注！单手掷注 5,000+，全场目光聚集！”；
-   * 伴随旋转星芒与金币跳跃，持续 2.5 秒淡出。
-2. **All-in 屏幕雷电全押震颤 ([AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx))**：
-   * 玩家点击“全押”时触发；
-   * 屏幕四周激活 8px 暗红雷电暗角与全屏心跳震颤动效（`allin-shake`）；
-   * 两侧闪电劈落，屏幕中央弹出带烈焰烈火图标的金色 All-in 浮空徽章（“孤注一掷 · 绝境亮剑”）；
-   * 音频引擎同步播放双脉冲深沉心跳与雷鸣声（`playAllIn()`），沉浸感拉满。
+1. **首次 5000+ 全屏大金盛典与女声播报 ([GoldStreamer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/GoldStreamer.tsx))**：
+   * **触发条件**：每局牌中，当**首次**出现单次实际押注金额 $\ge 5000$（5000 或 5000+）时全桌同步触发（同一局后续 5000+ 押注不再重复触发全屏阻断）；
+   * **全屏占满与全桌操作锁定**：以 `fixed inset-0 z-[100] pointer-events-auto` 占满整个屏幕并拦截所有点击/触摸交互，同时锁定底部操作面板与 AI 出牌回合，持续 4.2 秒，期间所有人无法操作；
+   * **皇家大金盛典视觉与动态金额**：全屏黑金毛玻璃底幕配合居中旋转的皇家太阳金芒射线、漫天鎏金星尘粒子与 3D 浮雕“恭喜大金”主舞台，画面动态展示**玩家昵称**与**实际押注金额**（`首次下注 {amount} 码`，严格与实际押注金额相符）；
+   * **预录制真人感女声播报**：同步调用 [`SoundManager.playFirstGoldAnnouncement()`](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts#L293)，先奏响皇家庆典和弦，随后播放预录制的高品质中文女声 MP3 音频文件 [`/audio/first_gold.mp3`](file:///Users/prina/Downloads/pussyGame/client/public/audio/first_gold.mp3)（*“恭喜大金！豪气冲天，一掷千金，全场瞩目！”*）。
+2. **All-in 边缘流光与顶部战报特效 ([AllInEpicEffect.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/AllInEpicEffect.tsx))**：
+   * 玩家点击“全押”或收到全押广播时触发，持续 2.0 秒平滑进退场；
+   * **零遮挡中央视野**：屏幕中央 64% 区域保持完全通透，不放置任何遮挡牌桌、底池或筹码柱的中央弹窗；
+   * **四周电影感赤金暗角与火星粒子**：屏幕外圈柔和赤红暗角脉冲（`animate-allin-vignette`）、上下边缘能量锋线，以及左右两侧外沿升腾的赤金火星粒子（`animate-allin-ember`）；
+   * **顶部悬浮流光战报横幅**：在顶部状态栏下方弹出黑金赤焰胶囊战报（`animate-allin-banner`），表面伴随高光扫掠（`animate-allin-sheen`），动态展示 `ALL IN` 金属字样、全押玩家昵称及全押金额；
+   * **牌桌本体震动与桌沿流光**：联动 [PokerTable.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/table/PokerTable.tsx) 触发牌桌本体冲击震颤（`allin-shake`）与桌沿金红脉冲光晕，音频引擎同步播放双脉冲深沉心跳重低音（`playAllIn()`）。
 3. **绝密比牌决斗 (PK 碰撞对决 [PKClashModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/PKClashModal.tsx))**：
    * **发起流程**：第 2 轮及之后开放比牌；点击“比牌”按钮，牌桌所有存活对手头像亮起红色呼吸光圈并浮现“点击对决”靶心；
    * **消耗倍率**：扣除自身一次跟注金额的 2 倍，即闷牌扣除单注基准的 1 倍、明牌扣除 2 倍；
@@ -120,8 +131,10 @@ App 视图流转体系
      * 屏幕正中调出双人特写大幕（黑金背景 + 闪烁烈火决斗图标）；
      * 挑战者与守擂者两张暗色扑克牌自两侧以强烈势头在中线碰撞；
      * 碰撞瞬间伴随低频轰鸣与短促爆炸白噪音（`playPKClash()`）；
-     * 碰撞后**绝不公布双方底牌**，仅在输家头像盖上倾斜暗红色“战败”印戳；
-     * 输家在牌桌上的状态即刻置为 `lost`，手牌暗灰倾斜淘汰，杜绝底牌泄露外挂。
+     * 碰撞后仅胜者展示输者三张牌及“败者底牌 · 仅你可见”，其他玩家和观战者仍看到牌背；防守获胜同样适用。
+     * 胜者的弹窗保留 6 秒，可点击“返回牌桌”收起；其他视角保持 2.8 秒。终局战报等待比牌弹窗关闭后再显示，避免覆盖私密手牌。
+     * 输家状态即刻置为 `lost`；胜者视角的牌桌保留输者正面牌，其余视角仍为暗牌。牌桌不附加“仅你可见”等小字，提示仅在比牌弹窗展示。展示不依赖输者是否看牌，也不会替胜者查看自己的手牌。
+     * 服务端按本局直接胜负记录授予权限，重连后快照恢复；权限不因后续胜负继承，重置或新局清空。模拟控制器仅在本地玩家获胜时提供对应输者牌面；新局重新隐藏其他人手牌。
 4. **终局胜出结算卡片 ([SettlementModal.tsx](file:///Users/prina/Downloads/pussyGame/client/src/components/animations/SettlementModal.tsx))**：
    * 对局决出胜者时（其余全员弃牌/战败，或达到 20 轮上限亮牌），触发全屏纸屑礼花飞舞；
    * 弹出终局大捷金色奖杯卡片，展示赢家头像、独揽筹码数值（如 `+12,800 筹码`）；
@@ -130,9 +143,9 @@ App 视图流转体系
 
 ---
 
-## 四、 纯代码拟真音效系统 (Web Audio API)
+## 四、 拟真音效与语音系统 (Web Audio API + 预录制语音)
 
-位于 [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts)，无需下载外部音频资产，零网络等待、零跨域问题：
+位于 [SoundManager.ts](file:///Users/prina/Downloads/pussyGame/client/src/audio/SoundManager.ts)，结合 Web Audio API 实时合成与预录制真人感女声播报：
 
 | 音效方法 | 物理拟真声学原理 | 触发时机 |
 | :--- | :--- | :--- |
@@ -143,6 +156,7 @@ App 视图流转体系
 | `playPKClash()` | 160Hz $\to$ 40Hz 锯齿波轰鸣 + 0.2s 爆炸白噪声脉冲 | 1v1 比牌两牌碰撞瞬间 |
 | `playAllIn()` | 90Hz $\to$ 35Hz 双心跳脉冲（顿-顿）重低音波 | 点击全押（All-in）瞬间 |
 | `playWin()` | C 大调大三和弦琶音（C5-523Hz, E5-659Hz, G5-784Hz, C6-1046Hz） | 终局结算、胜者独揽奖池 |
+| `playFirstGoldAnnouncement()` | 皇家升调五音庆典琶音 + 播放预录制女声 MP3（`/audio/first_gold.mp3`：“恭喜大金！豪气冲天，一掷千金，全场瞩目！”） | 每局首次押注达到 5000 或 5000+ 时 |
 
 * **静音开关**：全站右上角支持一键静音/取消静音，状态自动持久化于本地 `localStorage.getItem('zjh_sound_muted')`。
 
@@ -175,13 +189,13 @@ App 视图流转体系
 位于 [AdminDashboard.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/AdminDashboard.tsx)，为独立于游戏桌的深度运维平台：
 
 ### 7.1 账号管理系统 (Accounts)
-* **全生命周期管控**：开通新账号、设置初始筹码、编辑昵称/头像、重置密码为明文指定新值、一键封禁/解封、永久安全删除（主管理员 admin 账号受物理锁保护，严禁删除）。
-* **多维统计指标**：总在册玩家数、实时在线数（含当前所在房号关联）、全网流通总筹码池、封禁账号数。
+* **页面能力与真实链路**：页面提供开号、资料编辑、角色选择、改密、封禁和删除等控件，但用户列表仍由本地数据初始化，若干写操作在请求失败后仍更新本地状态。这些界面表现不能证明服务端已保存。后端已提供普通玩家开号、本人资料修改、管理员改密；管理员编辑他人资料/角色、封禁和删除账号均待实现。
+* **统计边界**：当前后台统计基于页面本地用户列表，不能视为服务端真实全量统计；后端列表虽提供在线状态和所在房号，页面列表的完整读取接入仍待实现。
 * **搜索与多态筛选**：支持按用户名/昵称模糊检索，支持全量、在线、离线、已封禁四态快速过滤。
 
 ### 7.2 充值与资金系统 (Chips)
-* **快速双向充减**：支持任意玩家一键增加/扣减筹码，强制附带业务变更原因（如“老友微信转账充值”、“线下结算核减”）。
-* **全量审计日志 (Audit Log)**：每笔流水包含日志 ID、用户、变动数值、变动后余额、经办操作人、详细原因、精确时间戳，不可篡改。
+* **双向充减控件**：服务端已提供管理员原子充减接口并记录真实经办人；页面仍有请求失败后本地修改并显示成功的路径，待修复联机错误处理。原因在页面要求填写，服务端允许省略并生成默认描述。这里记录线下结算，不代表已经接入线上充值或提现。
+* **流水展示边界**：后台充值专账接口尚未实现；个人流水抽屉仍展示固定模拟数据。真实个人流水接口及管理员全局流水接口已经存在，完整页面读取接入待实现。全局接口新增结构化经办人和房间编号；旧数据未知值为 `null`。应用端流水只允许追加，不能称为不可篡改存证。
 
 ### 7.3 发牌规则配置与真实模拟
 
@@ -254,3 +268,7 @@ App 视图流转体系
 | | [AdminDashboard.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/AdminDashboard.tsx) | 管理中枢平台（账号管控、资金审计、算法调控与模拟器） |
 | | [LedgerDrawer.tsx](file:///Users/prina/Downloads/pussyGame/client/src/views/LedgerDrawer.tsx) | 个人筹码明细战绩抽屉 |
 | | [App.tsx](file:///Users/prina/Downloads/pussyGame/client/src/App.tsx) | 应用主入口与基于角色的全域视图流转 |
+
+### 2026-10-18 后端审查联动说明
+
+此次只修后端与契约，未修改上述页面代码。账号改密会使旧令牌失效并断开其在线连接，本次升级前令牌需要重新登录。资料及余额保存后，后端刷新所在房间快照；实际前端联机接入程度仍按本文各处“已实现/待实现”区分。详细范围见 [数据库与服务审查记录](database_service_review.md)。
