@@ -237,7 +237,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
             {/* All-in 梭哈 */}
             <button
-              onClick={() => onBet('allin', myBalance)}
+              onClick={() => {
+                // 全押会一次性押上全部余额且不可撤销，误触代价极高，先二次确认。
+                if (window.confirm(`确定全押 ${myBalance.toLocaleString()} 筹码吗？此操作不可撤销。`)) onBet('allin', myBalance);
+              }}
               disabled={!isMyTurn || myBalance <= 0}
               className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-black transition border shadow-lg ${
                 isMyTurn && myBalance > 0
