@@ -10,9 +10,9 @@ export class RoomManager {
 
   static createRoom(roomName: string, baseAnte: number = 10, turnSeconds: number = 20, io?: Server, playerCount: number = 2): Room {
     if (typeof roomName !== 'string') throw new Error('房间名称必须为文本');
-    if (typeof baseAnte !== 'number' || !Number.isFinite(baseAnte) || baseAnte <= 0
+    if (typeof baseAnte !== 'number' || !Number.isSafeInteger(baseAnte) || baseAnte <= 0
       || baseAnte * 10 > Number.MAX_SAFE_INTEGER) {
-      throw new Error('底注必须为有效的正数');
+      throw new Error('底注必须为正整数');
     }
     if (!Number.isInteger(turnSeconds)) throw new Error('思考时间必须为整数秒');
     if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) throw new Error('房间人数必须为 2～8 的整数');

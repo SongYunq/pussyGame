@@ -114,3 +114,17 @@ test('庄位落在空座位时，开局后庄家归属到实际参与者且首�
     assert.equal(room.seats[room.dealerSeatIndex]?.user?.id, a);
   } finally { room.dispose(); }
 });
+
+test('加注档位必须为大于当前单注的正整数', () => {
+  const [a, b] = [createPlayer(), createPlayer()];
+  const room = startedRoom([a, b]);
+  try {
+    const first = room.currentTurnPlayerId!;
+    for (const bad of [10.5, '20.1', 'abc', -50, Number.MAX_SAFE_INTEGER + 2]) {
+      assert.throws(() => room.bet(first, 'raise', bad as any), /正整数/);
+    }
+    assert.throws(() => room.bet(first, 'raise', 10), /大于当前单注/);
+    room.bet(first, 'raise', '20');
+    assert.equal(room.currentBet, 20);
+  } finally { room.dispose(); }
+});

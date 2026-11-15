@@ -338,7 +338,10 @@ export class Room {
       payAmount = this.currentBet * betMultiplier;
     } else if (actionType === 'raise') {
       const targetBet = typeof chipOption === 'number' || typeof chipOption === 'string' ? Number(chipOption) : NaN;
-      if (!Number.isFinite(targetBet) || targetBet > Number.MAX_SAFE_INTEGER || targetBet <= this.currentBet) {
+      if (!Number.isSafeInteger(targetBet) || targetBet <= 0) {
+        throw new Error('加注档位必须为正整数');
+      }
+      if (targetBet <= this.currentBet) {
         throw new Error('加注档位必须大于当前单注');
       }
       nextBet = targetBet;

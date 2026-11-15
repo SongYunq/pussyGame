@@ -279,7 +279,7 @@ export type PlayerTableStatus =
   * **开局底注**：所有玩家仍按 `baseAnte` 原额扣除，不受明暗牌倍率影响；
   * **未看牌（闷牌）**：下注额 = `currentBet * 0.5`；
   * **已看牌（明注）**：下注额 = `currentBet`；
-  * **加注（Raise）**：玩家传入新的加注档位（必须大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
+  * **加注（Raise）**：玩家传入新的加注档位（必须为正整数且大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
   * **全押（All-in）**：扣除玩家当前全部余额 `balance`，按 `balance / (hasLooked ? 1 : 0.5)` 折算单注。若折算值大于当前 `currentBet`，则抬高单注基准；
 * **下注特效广播**：每局首次单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（全屏大金盛典与女声播报），All-in 标记为 `specialEffect: 'allin'`（全押特效）。
 
