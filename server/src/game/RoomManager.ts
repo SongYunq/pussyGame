@@ -12,6 +12,10 @@ export class RoomManager {
 
   static createRoom(roomName: string, baseAnte: number = 10, turnSeconds: number = 20, io?: Server, playerCount: number = 2): Room {
     if (typeof roomName !== 'string') throw new Error('房间名称必须为文本');
+    // 与前端输入框 maxLength=30 保持一致；房名会随每次 room:state 广播给全房间。
+    if (roomName.trim().length > 30 || /[\u0000-\u001f\u007f]/u.test(roomName)) {
+      throw new Error('房间名称不能超过 30 个字符且不能包含控制字符');
+    }
     if (typeof baseAnte !== 'number' || !Number.isSafeInteger(baseAnte) || baseAnte <= 0
       || baseAnte * 10 > Number.MAX_SAFE_INTEGER) {
       throw new Error('底注必须为正整数');

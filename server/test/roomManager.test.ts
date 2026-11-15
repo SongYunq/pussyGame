@@ -51,3 +51,11 @@ test('重新上线后不会被释放；进行中的牌局不释放', () => {
   room.dispose();
   RoomManager.removeEmptyRoom(room.roomId);
 });
+
+test('房间名称限制 30 字符且禁止控制字符', () => {
+  assert.throws(() => RoomManager.createRoom('x'.repeat(31), 10, 20), /30/);
+  assert.throws(() => RoomManager.createRoom('a\nb', 10, 20), /控制字符/);
+  const room = RoomManager.createRoom(`  ${'名'.repeat(30)}  `, 10, 20);
+  assert.equal(room.roomName, '名'.repeat(30));
+  RoomManager.deleteRoom(room.roomId);
+});
