@@ -346,25 +346,14 @@ export class Room {
       nextBet = Math.max(this.currentBet, effectiveBet);
     }
 
-    if (!Number.isFinite(payAmount) || payAmount <= 0 || payAmount > Number.MAX_SAFE_INTEGER
-      || !Number.isFinite(nextBet) || nextBet > Number.MAX_SAFE_INTEGER
-      || this.totalPot + payAmount > Number.MAX_SAFE_INTEGER || this.totalPot + payAmount <= this.totalPot
-      || seat.currentInvested + payAmount > Number.MAX_SAFE_INTEGER || seat.currentInvested + payAmount <= seat.currentInvested) {
+    if (!Number.isFinite(nextBet) || nextBet > Number.MAX_SAFE_INTEGER) {
       throw new Error('下注金额超出有效范围');
     }
+    this.assertChargeable(seat, payAmount, '下注金额超出有效范围');
 
     // 扣减筹码
-    const res = UserModel.changeBalance(
-      userId,
-      -payAmount,
-      'bet',
-      `第 ${this.roomId} 房间${actionType === 'raise' ? '加注' : actionType === 'allin' ? '全押' : '跟注'}`,
-      { roomId: this.roomId }
-    );
+    this.chargeSeat(seat, payAmount, `第 ${this.roomId} 房间${actionType === 'raise' ? '加注' : actionType === 'allin' ? '全押' : '跟注'}`);
     this.currentBet = nextBet;
-    seat.user!.balance = res.balance;
-    seat.currentInvested += payAmount;
-    this.totalPot += payAmount;
 
     // 特效判定（5000+ 大金特效每局仅在首次达到时触发）
     let specialEffect: 'none' | 'gold' | 'allin' = 'none';
@@ -457,26 +446,13 @@ export class Room {
     const user = UserModel.findById(initiatorId);
     if (!user) throw new Error('用户不存在');
     initSeat.user!.balance = user.balance;
-    if (!Number.isFinite(cost) || cost <= 0 || cost > Number.MAX_SAFE_INTEGER
-      || this.totalPot + cost > Number.MAX_SAFE_INTEGER || this.totalPot + cost <= this.totalPot
-      || initSeat.currentInvested + cost > Number.MAX_SAFE_INTEGER || initSeat.currentInvested + cost <= initSeat.currentInvested) {
-      throw new Error('比牌金额超出有效范围');
-    }
+    this.assertChargeable(initSeat, cost, '比牌金额超出有效范围');
     if (user.balance < cost) {
       throw new Error('筹码不足，无法发起比牌');
     }
 
     // 扣除比牌花费
-    const changeRes = UserModel.changeBalance(
-      initiatorId,
-      -cost,
-      'bet',
-      `第 ${this.roomId} 房间发起比牌对决`,
-      { roomId: this.roomId }
-    );
-    initSeat.user!.balance = changeRes.balance;
-    initSeat.currentInvested += cost;
-    this.totalPot += cost;
+    this.chargeSeat(initSeat, cost, `第 ${this.roomId} 房间发起比牌对决`);
 
     // 裁判引擎判定胜负
     const result = GameReferee.compareHands(initSeat.cards!, targetSeat.cards!, 'A', this.deckKind);
@@ -728,6 +704,23 @@ export class Room {
    */
   public getActiveSeats(): TableSeat[] {
     return this.seats.filter((s): s is TableSeat => s !== null && s.status === 'active');
+  }
+
+  /** 校验一次扣款后金额、奖池与个人累计投入均处于安全整数范围内且确实增长。 */
+  private assertChargeable(seat: TableSeat, amount: number, message: string): void {
+    const fits = (base: number) => base + amount <= Number.MAX_SAFE_INTEGER && base + amount > base;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > Number.MAX_SAFE_INTEGER
+      || !fits(this.totalPot) || !fits(seat.currentInvested)) {
+      throw new Error(message);
+    }
+  }
+
+  /** 原子扣款并同步座位余额、个人投入与奖池；扣款失败时内存状态保持不变。 */
+  private chargeSeat(seat: TableSeat, amount: number, description: string): void {
+    const result = UserModel.changeBalance(seat.user!.id, -amount, 'bet', description, { roomId: this.roomId });
+    seat.user!.balance = result.balance;
+    seat.currentInvested += amount;
+    this.totalPot += amount;
   }
 
   public findSeatIndexByUserId(userId: number): number {

@@ -86,3 +86,16 @@ test('重复弃牌不会重复派奖', () => {
     assert.equal(balanceOf(winner), 10_010);
   } finally { room.dispose(); }
 });
+
+test('扣款失败时奖池与个人投入保持不变', () => {
+  const [a, b] = [createPlayer(100), createPlayer(100)];
+  const room = startedRoom([a, b]);
+  try {
+    const first = room.currentTurnPlayerId!;
+    const potBefore = room.totalPot;
+    assert.throws(() => room.bet(first, 'raise', 10_000), /余额不足/);
+    assert.equal(room.totalPot, potBefore);
+    assert.equal(room.seats.find(s => s?.user?.id === first)!.currentInvested, 10);
+    assert.equal(room.currentTurnPlayerId, first);
+  } finally { room.dispose(); }
+});
