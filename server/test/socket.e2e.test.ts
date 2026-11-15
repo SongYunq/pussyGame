@@ -61,3 +61,22 @@ test('E2E：不存在的房间返回 404', async () => {
     assert.equal(reply.code, 404);
   } finally { sa.close(); }
 });
+
+test('E2E：同账号多窗口都收到快照，onlinePlayerIds 反映在线状态', async () => {
+  const [a, b] = [createPlayer(), createPlayer()];
+  const a1 = await connectAs(harness, a);
+  const a2 = await connectAs(harness, a);
+  const sb = await connectAs(harness, b);
+  try {
+    const created = await request(a1, 'room:create', { roomName: '多窗', baseAnte: 10, turnSeconds: 20, playerCount: 2 });
+    const joined = (s: any) => s.onlinePlayerIds.includes(b);
+    const both = Promise.all([nextEvent(a1, 'room:state', joined), nextEvent(a2, 'room:state', joined)]);
+    await request(sb, 'room:join', { roomId: created.roomId });
+    const [s1, s2] = await both;
+    assert.deepEqual(s1, s2);
+    assert.deepEqual([...s1.onlinePlayerIds].sort(), [a, b].sort());
+    const left = nextEvent(a1, 'room:state', (s: any) => !s.onlinePlayerIds.includes(b));
+    sb.close();
+    await left;
+  } finally { a1.close(); a2.close(); sb.close(); }
+});

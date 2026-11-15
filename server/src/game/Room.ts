@@ -1,4 +1,4 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { Card, CompareResultEvent, RoomState, TableSeat } from '../types/index.js';
 import { DeckKind, splitPot } from '../shared/poker.js';
 import { dealHands } from '../shared/dealing.js';
@@ -740,7 +740,7 @@ export class Room {
    * 生成防作弊脱敏全量快照
    * 本人手牌在看牌后（或弃牌/出局/非对局阶段）可见，本局直接击败玩家的手牌对胜者可见，其余 cards 为 null
    */
-  public getMaskedState(forUserId?: number): RoomState {
+  public getMaskedState(forUserId?: number, onlineUserIds: Set<number> = this.onlineUserIds()): RoomState {
     const maskedSeats: (TableSeat | null)[] = this.seats.map((seat) => {
       if (!seat) return null;
       // 本人底牌仅在看牌后（或已不再参与下注时）下发，杜绝改装客户端“偷看后仍按闷牌半价下注”。
@@ -760,7 +760,7 @@ export class Room {
       roomName: this.roomName,
       playerCount: this.playerCount,
       onlinePlayerIds: Array.from(new Set([...this.seats.flatMap(seat => seat?.user ? [seat.user.id] : []), ...this.spectators.keys()]))
-        .filter(id => !this.io || this.findSocketIdsByUserId(id).length > 0),
+        .filter(id => !this.io || onlineUserIds.has(id)),
       deckKind: this.deckKind,
       baseAnte: this.baseAnte,
       turnSeconds: this.turnSeconds,
@@ -777,29 +777,40 @@ export class Room {
   }
 
   /**
-   * 向全房间广播脱敏快照 (每个 Socket 单独脱敏)
+   * 向全房间广播脱敏快照 (每个用户单独脱敏)
+   * 先按用户分组房间内连接，同一用户的多个窗口共用一份快照；在线集合只计算一次，
+   * 避免原先“每个连接 × 每个玩家 × 遍历全部连接”的 O(S²·P) 开销。
    */
   public broadcastState(): void {
     if (!this.io) return;
-
-    const roomChannel = `room:${this.roomId}`;
-    const sockets = this.io.sockets.adapter.rooms.get(roomChannel);
-    if (!sockets) return;
-
-    for (const socketId of sockets) {
-      const socket = this.io.sockets.sockets.get(socketId);
-      if (socket) {
-        const userId = (socket as any).userId;
-        const state = this.getMaskedState(userId);
-        socket.emit('room:state', state);
-      }
+    const socketsByUser = this.socketsByUser();
+    const onlineUserIds = new Set(socketsByUser.keys());
+    for (const [userId, sockets] of socketsByUser) {
+      const state = this.getMaskedState(userId, onlineUserIds);
+      for (const socket of sockets) socket.emit('room:state', state);
     }
   }
 
+  /** 房间频道内的已鉴权连接，按用户 ID 分组。 */
+  private socketsByUser(): Map<number, Socket[]> {
+    const result = new Map<number, Socket[]>();
+    if (!this.io) return result;
+    for (const socketId of this.io.sockets.adapter.rooms.get(`room:${this.roomId}`) ?? []) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      const userId = (socket as any)?.userId;
+      if (!socket || typeof userId !== 'number') continue;
+      const list = result.get(userId);
+      if (list) list.push(socket);
+      else result.set(userId, [socket]);
+    }
+    return result;
+  }
+
+  private onlineUserIds(): Set<number> {
+    return new Set(this.socketsByUser().keys());
+  }
+
   private findSocketIdsByUserId(userId: number): string[] {
-    if (!this.io) return [];
-    const socketIds = this.io.sockets.adapter.rooms.get(`room:${this.roomId}`);
-    return Array.from(socketIds ?? []).filter(socketId =>
-      (this.io!.sockets.sockets.get(socketId) as any)?.userId === userId);
+    return (this.socketsByUser().get(userId) ?? []).map(socket => socket.id);
   }
 }

@@ -324,6 +324,8 @@ public getMaskedState(forUserId?: number): RoomState {
 }
 ```
 
+广播实现（2026-11 GrokBotLine）：`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
+
 ---
 
 ## 五、 WebSocket (Socket.io) 实时网关规范
