@@ -359,8 +359,9 @@ HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.a
 | `game:compare` | `{ targetPlayerId }` | Ack 回调 + 广播 `game:compare_result` | 发起绝密双人比牌 PK 对决 |
 
 ### 5.4 社交互动信令
-* `chat:emoji`：表情 ID 须为非空字符串且不超过 64 字符，合法时房间内广播 `chat:emoji_broadcast`，畸形消息忽略；
-* `chat:phrase`：短语 ID 为非负安全整数、文本非空且不超过 200 字符，合法时房间内广播 `chat:phrase_broadcast`，畸形消息忽略。
+* `chat:emoji`：表情须在 [`shared/chat.ts`](../server/src/shared/chat.ts) 的 `QUICK_EMOJIS` 白名单内，合法时房间内广播 `chat:emoji_broadcast`，其余忽略；
+* `chat:phrase`：按 `QUICK_PHRASES` 白名单解析（文本精确匹配优先，其次编号），只广播服务端标准文案，不转发自定义文本；
+* 两者共用 [`SlidingWindowLimiter`](../server/src/utils/rateLimiter.ts)：每账号每 10 秒最多 6 条，超出静默丢弃。
 
 ---
 

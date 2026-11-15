@@ -3,6 +3,7 @@ import { RoomState, CompareResultEvent, GameOverEvent } from '../types/game';
 import { useGameStore } from '../store/useGameStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { sound } from '../audio/SoundManager';
+import { QUICK_PHRASES } from '../../../server/src/shared/chat';
 
 type Ack = { code: number; message?: string; roomId?: string };
 class SocketService {
@@ -94,6 +95,9 @@ class SocketService {
   public fold() { return this.request('game:fold'); }
   public compare(targetPlayerId: number) { return this.request('game:compare', { targetPlayerId }); }
   public sendEmoji(emojiId: string) { this.socket?.emit('chat:emoji', { emojiId }); }
-  public sendPhrase(text: string) { this.socket?.emit('chat:phrase', { phraseId: 0, text }); }
+  public sendPhrase(text: string) {
+    const phraseId = (QUICK_PHRASES as readonly string[]).indexOf(text);
+    if (phraseId !== -1) this.socket?.emit('chat:phrase', { phraseId, text });
+  }
 }
 export const socketService = new SocketService();

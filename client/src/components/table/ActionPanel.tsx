@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TableSeat } from '../../types/game';
 import { Eye, Flame, Swords, ShieldAlert, Sparkles, Smile, MessageSquare, ChevronUp } from 'lucide-react';
+import { QUICK_EMOJIS, QUICK_PHRASES } from '../../../../server/src/shared/chat';
 
 interface ActionPanelProps {
   mySeat: TableSeat | null;
@@ -17,14 +18,9 @@ interface ActionPanelProps {
   onSendPhrase: (phrase: string) => void;
 }
 
-const EMOJIS = ['🔥', '😎', '😭', '💀', '💰', '👍', '🚀', '🍺'];
-const PHRASES = [
-  '快点吧，我等到花儿都谢了！',
-  '梭哈是一种智慧！',
-  '风水轮流转，底裤全靠这把！',
-  '老铁，稳住别慌！',
-  '搏一搏，单车变摩托！',
-];
+// 表情与短语白名单与服务端共用，服务端只广播白名单内容。
+const EMOJIS = QUICK_EMOJIS;
+const PHRASES = QUICK_PHRASES;
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({
   mySeat,

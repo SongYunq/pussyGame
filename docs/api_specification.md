@@ -756,20 +756,21 @@ const socket = io("http://localhost:3000", {
 
 #### 1. 发送快捷表情
 * **客户端发出**：`chat:emoji`
-* **入参**：`{ "emojiId": "fire" }` (如: `cool`, `fire`, `sweat`, `skull`, `money`, `cry`)，须为非空字符串且不超过 64 字符；畸形消息忽略。
+* **入参**：`{ "emojiId": "🔥" }`，必须是 [`shared/chat.ts`](../server/src/shared/chat.ts) 中 `QUICK_EMOJIS` 白名单内的 8 个表情之一（2026-11 起收紧，原先接受任意 ≤64 字符文本）；不合法或超出频率限制的消息静默忽略。
 * **服务端广播**：`chat:emoji_broadcast`
 ```json
 {
   "playerId": 1,
-  "emojiId": "fire"
+  "emojiId": "🔥"
 }
 ```
 *前端动效*：在 `playerId` 头像上方浮动冒出气泡表情动画，并伴有音效，2 秒后淡出。
 
 #### 2. 发送快捷短语
 * **客户端发出**：`chat:phrase`
-* **入参**：`{ "phraseId": 3, "text": "快点吧，我等到花儿都谢了！" }`，编号为非负安全整数，文本非空且不超过 200 字符；畸形消息忽略。
-* **服务端广播**：`chat:phrase_broadcast`，在头像侧边弹出气泡文本框。
+* **入参**：`{ "phraseId": 0, "text": "快点吧，我等到花儿都谢了！" }`，`phraseId` 为 `QUICK_PHRASES` 白名单下标（0～4）。服务端优先按 `text` 精确匹配白名单（兼容旧客户端固定上报编号 0），否则按编号取标准文案；**不再转发客户端自定义文本**，防止改装客户端冒充短语发送任意内容。
+* **服务端广播**：`chat:phrase_broadcast`，负载 `{ playerId, phraseId, text }`，其中 `text` 为服务端标准文案，在头像侧边弹出气泡文本框。
+* **频率限制**：同一账号（含多窗口）表情与短语合计每 10 秒最多 6 条，超出部分静默丢弃。
 
 ---
 
