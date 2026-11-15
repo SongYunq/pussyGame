@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { getDb } from '../db/database.js';
+import { getDb, statement } from '../db/database.js';
 import { UserRecord } from '../types/index.js';
 import { isPassword, isTrimmedText } from '../utils/inputValidation.js';
 
@@ -18,14 +18,12 @@ function validateOperator(operatorId?: number): void {
 
 export class UserModel {
   static findById(id: number): UserRecord | null {
-    const db = getDb();
-    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRecord | undefined;
+    const row = statement('SELECT * FROM users WHERE id = ?').get(id) as UserRecord | undefined;
     return row || null;
   }
 
   static findByUsername(username: string): UserRecord | null {
-    const db = getDb();
-    const row = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as UserRecord | undefined;
+    const row = statement('SELECT * FROM users WHERE username = ?').get(username) as UserRecord | undefined;
     return row || null;
   }
 
@@ -50,7 +48,7 @@ export class UserModel {
     const passwordHash = bcrypt.hashSync(passwordPlain, salt);
 
     const transaction = db.transaction(() => {
-      const result = db.prepare(`
+      const result = statement(`
         INSERT INTO users (username, password_hash, nickname, avatar, balance, role)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(username.trim(), passwordHash, nickname.trim(), avatar.trim(), initialChips, role);
@@ -58,7 +56,7 @@ export class UserModel {
       const userId = Number(result.lastInsertRowid);
 
       if (initialChips > 0) {
-        db.prepare(`
+        statement(`
           INSERT INTO ledgers (user_id, type, amount, balance_after, description, operator_id)
           VALUES (?, 'recharge', ?, ?, '管理员开号赠送初始筹码', ?)
         `).run(userId, initialChips, initialChips, operatorId ?? null);
@@ -75,7 +73,6 @@ export class UserModel {
         (avatar !== undefined && !isTrimmedText(avatar, 256))) {
       throw new Error('昵称或头像无效');
     }
-    const db = getDb();
     const user = this.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
@@ -84,7 +81,7 @@ export class UserModel {
     const newNickname = nickname === undefined ? user.nickname : nickname.trim();
     const newAvatar = avatar === undefined ? user.avatar : avatar.trim();
 
-    db.prepare(`
+    statement(`
       UPDATE users
       SET nickname = ?, avatar = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -95,11 +92,10 @@ export class UserModel {
 
   static resetPassword(userId: number, newPasswordPlain: string): void {
     if (!isPassword(newPasswordPlain)) throw new Error('新密码格式无效');
-    const db = getDb();
     const salt = bcrypt.genSaltSync(10);
     const passwordHash = bcrypt.hashSync(newPasswordPlain, salt);
 
-    const result = db.prepare(`
+    const result = statement(`
       UPDATE users
       SET password_hash = ?, auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -111,8 +107,7 @@ export class UserModel {
   }
 
   static getAllUsers(): Array<Omit<UserRecord, 'password_hash' | 'auth_version'>> {
-    const db = getDb();
-    const rows = db.prepare(`
+    const rows = statement(`
       SELECT id, username, nickname, avatar, balance, role, created_at, updated_at
       FROM users
       ORDER BY id ASC
@@ -151,7 +146,7 @@ export class UserModel {
     const db = getDb();
 
     const transaction = db.transaction(() => {
-      const user = db.prepare('SELECT id, balance FROM users WHERE id = ?').get(userId) as
+      const user = statement('SELECT id, balance FROM users WHERE id = ?').get(userId) as
         | { id: number; balance: number }
         | undefined;
 
@@ -170,13 +165,13 @@ export class UserModel {
         throw new Error('余额超出可支持的数值范围');
       }
 
-      db.prepare(`
+      statement(`
         UPDATE users
         SET balance = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(newBalance, userId);
 
-      db.prepare(`
+      statement(`
         INSERT INTO ledgers (user_id, type, amount, balance_after, description, operator_id, room_id)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(userId, type, amount, newBalance, description, context.operatorId ?? null, context.roomId ?? null);
