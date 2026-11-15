@@ -53,6 +53,10 @@ export function setupSocketHandler(io: Server): void {
       existingRoom.setIo(io);
       // 本连接已加入房间频道，合并后的广播会同时推送给它，无需重复定向发送。
       existingRoom.broadcastState();
+    } else {
+      // 明确告知客户端当前不在任何房间（如服务重启后房间已不存在），
+      // 客户端据此退出旧牌桌，而不必在每次重连时先清空界面。
+      socket.emit('room:left', { roomId: null });
     }
 
     // 注册各类事件

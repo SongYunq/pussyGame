@@ -101,3 +101,32 @@ test('E2E：同一动作链中的多次广播被合并为一次快照', async ()
     assert.equal(snapshots, 1, '准备→开局→回调后广播只推送一份快照');
   } finally { sa.close(); sb.close(); }
 });
+
+test('E2E：不在任何房间的连接会收到 room:left(null)；在房间中重连收到快照', async () => {
+  const { io: connect } = await import('socket.io-client');
+  const { signToken } = await import('../src/utils/jwt.js');
+  const { UserModel } = await import('../src/models/userModel.js');
+  const id = createPlayer();
+  const user = UserModel.findById(id)!;
+  const token = signToken({ userId: id, username: user.username, role: user.role });
+  const open = () => {
+    const socket = connect(harness.url, { auth: { token }, transports: ['websocket'], forceNew: true, reconnection: false, autoConnect: false });
+    const first = new Promise<[string, any]>(resolve => {
+      socket.once('room:left', (payload: any) => resolve(['room:left', payload]));
+      socket.once('room:state', (payload: any) => resolve(['room:state', payload]));
+    });
+    socket.connect();
+    return { socket, first };
+  };
+  const a = open();
+  try {
+    assert.deepEqual(await a.first, ['room:left', { roomId: null }]);
+    const created = await request(a.socket, 'room:create', { roomName: '重连', baseAnte: 10, turnSeconds: 20, playerCount: 2 });
+    const b = open();
+    try {
+      const [event, state] = await b.first;
+      assert.equal(event, 'room:state');
+      assert.equal(state.roomId, created.roomId);
+    } finally { b.socket.close(); }
+  } finally { a.socket.close(); }
+});

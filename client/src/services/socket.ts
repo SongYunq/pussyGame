@@ -15,8 +15,9 @@ class SocketService {
     this.socket = io('/', { auth: { token }, transports: ['websocket'], autoConnect: false });
     const socket = this.socket;
     socket.on('connect', () => {
-      useGameStore.getState().clearRoom();
-      useGameStore.setState({ connectionStatus: 'connected', error: null });
+      // 重连时保留当前牌桌快照，避免界面闪回大厅；服务端随后会推送最新 room:state，
+      // 若已不在任何房间则推送 room:left 再清空。仅清理与旧连接相关的瞬时动效。
+      useGameStore.setState({ connectionStatus: 'connected', error: null, flyingChips: [], floatingBubbles: [], isPKSelecting: false });
     });
     socket.on('disconnect', reason => {
       useGameStore.setState({ connectionStatus: 'disconnected' });
