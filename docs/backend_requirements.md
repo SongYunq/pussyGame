@@ -436,6 +436,16 @@ if (fs.existsSync(config.clientDistPath)) {
 
 2026-10-19 起，测试源码、测试配置及专用依赖清单仅留本机，仓库不再声明测试命令和专用测试依赖。游戏仓库的正式入口保持 `npm run build` 和 `npm start`；本机维护者使用另行保存的测试入口继续验收。旧验证记录见 [数据库与服务审查记录](database_service_review.md)。
 
+2026-11 GrokBotLine 分支（待维护者确认）：为便于审查本分支的优化，新增一套随仓库提交的轻量测试，与本机私有测试（`/server/tests/`，仍被忽略）互不冲突。该做法与上一段 2026-10-19 的“测试仅留本机”约定不同，是否保留由维护者决定；如不保留，删除 `server/test/`、`server/package.json` 中的 `test`/`typecheck` 脚本与 `socket.io-client` 开发依赖，以及根目录 `test`/`typecheck`/`check` 脚本即可，业务代码不依赖它们。
+
+| 命令 | 作用 |
+| :--- | :--- |
+| `npm --prefix server test` | Node 内置 `node:test` + `tsx`，使用 `NODE_ENV=test DB_PATH=:memory:`，覆盖裁判、发牌随机源、房间状态机、RoomManager、Ack 注册器、聊天白名单与限流、HTTP 登录限流与安全头、Socket.io 端到端流程 |
+| `npm run typecheck` | 服务端 `src` + `test` 与客户端的 TypeScript 类型检查 |
+| `npm run check` | 依次执行类型检查、服务端测试与双端构建 |
+
+注意：`better-sqlite3@11` 暂无 Node 24 预编译包，在无编译工具链的环境请使用 Node 22 LTS 安装依赖。
+
 ## 九、 规则进阶探索与扩展设计：爆金币赏金击杀流 (Bounty Mode)
 
 > **状态与实施约束（2026-10-18 用户确认）**：本节仅记录创想，尚未实现，短期内不计划开发，也未纳入近期开发或验收范围。以下规则、数值和参数示例均不代表已确认的实施需求或现有能力。除非用户后续明确要求启动该玩法，否则维护、审查、补齐功能和文档同步均不得被视为实施授权；不得据此新增模式参数、数据库字段、接口、页面或赏金结算逻辑。现有经典玩法继续按已实现规则维护。
