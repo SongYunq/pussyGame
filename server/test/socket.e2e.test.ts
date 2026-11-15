@@ -80,3 +80,24 @@ test('E2E：同账号多窗口都收到快照，onlinePlayerIds 反映在线状�
     await left;
   } finally { a1.close(); a2.close(); sb.close(); }
 });
+
+test('E2E：同一动作链中的多次广播被合并为一次快照', async () => {
+  const [a, b] = [createPlayer(), createPlayer()];
+  const sa = await connectAs(harness, a);
+  const sb = await connectAs(harness, b);
+  try {
+    const created = await request(sa, 'room:create', { roomName: '合并', baseAnte: 10, turnSeconds: 0, playerCount: 2 });
+    await request(sb, 'room:join', { roomId: created.roomId });
+    await request(sa, 'room:sit', { seatIndex: 0 });
+    await request(sb, 'room:sit', { seatIndex: 1 });
+    await request(sa, 'room:ready', { isReady: true });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    let snapshots = 0;
+    sa.on('room:state', () => { snapshots++; });
+    const started = nextEvent(sa, 'room:state', (s: any) => s.gameStatus === 'playing');
+    await request(sb, 'room:ready', { isReady: true }); // 触发自动开局
+    await started;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(snapshots, 1, '准备→开局→回调后广播只推送一份快照');
+  } finally { sa.close(); sb.close(); }
+});

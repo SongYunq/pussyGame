@@ -51,7 +51,7 @@ export function setupSocketHandler(io: Server): void {
     if (existingRoom) {
       socket.join(`room:${existingRoom.roomId}`);
       existingRoom.setIo(io);
-      socket.emit('room:state', existingRoom.getMaskedState(userId));
+      // 本连接已加入房间频道，合并后的广播会同时推送给它，无需重复定向发送。
       existingRoom.broadcastState();
     }
 
@@ -74,7 +74,6 @@ export function setupSocketHandler(io: Server): void {
         // 若仅在观战席，离开房间并清除
         if (room.spectators.has(userId) && !RoomManager.getUserOnlineStatus(userId).isOnline) {
           room.removeSpectator(userId);
-          room.broadcastState();
           RoomManager.removeEmptyRoom(room.roomId);
         }
         room.broadcastState();

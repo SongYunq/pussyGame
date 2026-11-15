@@ -63,11 +63,8 @@ export function registerRoomEvents(io: Server, socket: Socket): void {
     const room = RoomManager.getRoom(data.roomId);
     if (!room) throw new SocketActionError('房间不存在', 404);
     joinRoom(room);
-    afterAck(() => {
-      // 给当前连入玩家立即定向推送最新的个人状态快照
-      socket.emit('room:state', room.getMaskedState(userId));
-      room.broadcastState();
-    });
+    // 广播覆盖本账号全部已加入频道的连接，无需再单独定向推送一次。
+    afterAck(() => room.broadcastState());
     return { code: 200, roomId: room.roomId };
   });
 

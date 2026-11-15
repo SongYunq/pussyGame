@@ -39,6 +39,7 @@ export class Room {
   private hasTriggeredFirstGold: boolean = false;
   private comparisonWins: Map<number, Set<number>> = new Map();
   private io?: Server;
+  private broadcastScheduled = false;
 
   constructor(options: RoomOptions) {
     this.roomId = options.roomId;
@@ -782,6 +783,19 @@ export class Room {
    * 避免原先“每个连接 × 每个玩家 × 遍历全部连接”的 O(S²·P) 开销。
    */
   public broadcastState(): void {
+    // 同一同步调用链中的多次广播合并为一次：例如“准备→自动开局→回调后广播”、
+    // “离座→弃牌→轮转”等路径过去会连续推送 2～3 份相同快照。
+    // 微任务在当前事件处理结束、任何 I/O 之前执行，先于本链路已发出的事件之后送达。
+    if (!this.io || this.broadcastScheduled) return;
+    this.broadcastScheduled = true;
+    queueMicrotask(() => {
+      this.broadcastScheduled = false;
+      this.flushBroadcast();
+    });
+  }
+
+  /** 立即向房间内每个用户推送其脱敏快照。 */
+  private flushBroadcast(): void {
     if (!this.io) return;
     const socketsByUser = this.socketsByUser();
     const onlineUserIds = new Set(socketsByUser.keys());

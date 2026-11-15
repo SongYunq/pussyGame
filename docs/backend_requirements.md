@@ -324,7 +324,7 @@ public getMaskedState(forUserId?: number): RoomState {
 }
 ```
 
-广播实现（2026-11 GrokBotLine）：`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
+广播实现（2026-11 GrokBotLine）：`broadcastState()` 只登记一次微任务，同一同步调用链（如“准备→自动开局→回调后广播”）中的多次调用合并为一次推送，推送时机在本链路已发出的事件与 Ack 之后；`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
 
 ---
 
@@ -336,7 +336,7 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 * **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](../server/src/utils/jwt.ts) 限定 HS256 并校验载荷、有效期和 `authVersion`，查询当前数据库用户身份后绑定至 Socket 实例；验签或凭据版本不符直接拒绝握手，每个入站事件还会再次检查；
 * **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](../server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
-  2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
+  2. 触发一次房间广播，该连接随房间内其他连接一起收到本人合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌。
 * **等待阶段离线占座释放**（2026-11 GrokBotLine，已实现）：`RoomManager` 记录每个账号最后一个连接断开的时间；服务端每 30 秒（或更短的宽限期）调用 `releaseOfflineSeats`，对 `waiting` 状态房间中离线超过 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120 秒，0 关闭）的在座玩家执行离座并离开房间，空房随之回收。`playing`/`settling` 阶段不释放，仍保留座位等待重连；牌局结束回到等待阶段后再按宽限期判断。
 
 登录接口使用 [`SlidingWindowLimiter`](../server/src/utils/rateLimiter.ts) 对“用户名 + IP”失败次数限流（15 分钟 10 次，超限 429），并以异步 `bcrypt.compare` 及不存在用户的假哈希比对消除事件循环阻塞与用户名枚举时序差。HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.auth_version`，撤销该账号已有令牌并主动断开其全部在线连接。此次升级前没有版本字段的旧令牌也会失效，需要重新登录。
