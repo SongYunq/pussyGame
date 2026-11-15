@@ -26,12 +26,19 @@ test('E2E：建房、入座、准备、开局，只下发自己的手牌', async
     const stateB = nextEvent(sb, 'room:state', (s: any) => s.gameStatus === 'playing');
     await request(sb, 'room:ready', { isReady: true });
     const start = await startA;
-    assert.equal(start.handCards.length, 3);
+    assert.equal(start.handCards, null, '开局不下发底牌，防止闷牌偷看');
     const state = await stateB;
     const mine = state.seats.find((s: any) => s?.user?.id === b);
     const theirs = state.seats.find((s: any) => s?.user?.id === a);
-    assert.equal(mine.cards.length, 3);
+    assert.equal(mine.cards, null, '未看牌时本人快照也不含底牌');
     assert.equal(theirs.cards, null);
+    const lookedState = nextEvent(sb, 'room:state', (s: any) => s.seats.some((seat: any) => seat?.user?.id === b && seat.hasLooked));
+    const look = await request(sb, 'game:look');
+    assert.equal(look.code, 200);
+    assert.equal(look.cards.length, 3);
+    const after = await lookedState;
+    assert.deepEqual(after.seats.find((s: any) => s?.user?.id === b).cards, look.cards);
+    assert.equal(after.seats.find((s: any) => s?.user?.id === a).cards, null);
   } finally { sa.close(); sb.close(); }
 });
 

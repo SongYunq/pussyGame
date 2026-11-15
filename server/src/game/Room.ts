@@ -260,7 +260,7 @@ export class Room {
             dealerId: this.seats[this.dealerSeatIndex]!.user!.id,
             baseAnte: this.baseAnte,
             totalPot: this.totalPot,
-            handCards: seat.cards,
+            handCards: null, // 底牌改由 game:look 回调及看牌后的 room:state 下发
             deckKind: this.deckKind,
           });
         }
@@ -738,12 +738,14 @@ export class Room {
 
   /**
    * 生成防作弊脱敏全量快照
-   * 仅本人手牌及本局直接击败玩家的手牌可见，其他人的 cards 为 null
+   * 本人手牌在看牌后（或弃牌/出局/非对局阶段）可见，本局直接击败玩家的手牌对胜者可见，其余 cards 为 null
    */
   public getMaskedState(forUserId?: number): RoomState {
     const maskedSeats: (TableSeat | null)[] = this.seats.map((seat) => {
       if (!seat) return null;
-      const isSelf = forUserId !== undefined && seat.user?.id === forUserId;
+      // 本人底牌仅在看牌后（或已不再参与下注时）下发，杜绝改装客户端“偷看后仍按闷牌半价下注”。
+      const isSelf = forUserId !== undefined && seat.user?.id === forUserId
+        && (seat.hasLooked || seat.status !== 'active' || this.gameStatus !== 'playing');
       const isDefeatedByViewer = forUserId !== undefined && seat.status === 'lost' && seat.user !== null
         && this.comparisonWins.get(forUserId)?.has(seat.user.id) === true;
       return {

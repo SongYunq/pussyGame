@@ -128,3 +128,17 @@ test('加注档位必须为大于当前单注的正整数', () => {
     assert.equal(room.currentBet, 20);
   } finally { room.dispose(); }
 });
+
+test('未看牌时本人快照不含底牌；看牌或弃牌后可见', () => {
+  const [a, b, c] = [createPlayer(), createPlayer(), createPlayer()];
+  const room = startedRoom([a, b, c]);
+  try {
+    const own = (id: number) => room.getMaskedState(id).seats.find(s => s?.user?.id === id)!.cards;
+    assert.equal(own(a), null);
+    room.lookCards(a);
+    assert.equal(own(a)?.length, 3);
+    assert.equal(room.getMaskedState(a).seats.find(s => s?.user?.id === b)!.cards, null);
+    room.fold(b);
+    assert.equal(own(b)?.length, 3, '弃牌后不再影响下注倍率，可查看本人底牌');
+  } finally { room.dispose(); }
+});

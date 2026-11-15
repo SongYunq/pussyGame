@@ -66,7 +66,7 @@
 1. **绝对权威防作弊（Zero-Trust Client）**：
    - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](../server/src/game/GameReferee.ts) 与 [`Room`](../server/src/game/Room.ts) 严格决断；
    - 客户端只能上报操作意图（如 `game:look`, `game:bet`, `game:compare`），服务端严密校验合法性；
-   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌，以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
+   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌（存活且未看牌时同样为 `null`，看牌后才下发，防止改装客户端偷看后仍按闷牌半价下注），以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
 2. **账户与流水的原子写入（SQLite Transactions）**：
    - 玩家入座直接使用钱包账户余额，所有底注、跟注、加注、比牌扣除与胜利奖金派发，均在 SQLite `db.transaction()` 中原子完成；
    - 每笔余额变化与对应流水在同一事务中提交；底注批扣和终局多笔派奖另有外层事务。该保证不覆盖内存牌局的进程崩溃恢复，详见第 2.6 节；
@@ -308,7 +308,9 @@ export type PlayerTableStatus =
 public getMaskedState(forUserId?: number): RoomState {
   const maskedSeats = this.seats.map((seat) => {
     if (!seat) return null;
-    const isSelf = forUserId !== undefined && seat.user?.id === forUserId;
+    // 本人底牌仅在看牌后、或本人已弃牌/出局、或非 playing 阶段时下发（闷牌防偷看）。
+    const isSelf = forUserId !== undefined && seat.user?.id === forUserId
+      && (seat.hasLooked || seat.status !== 'active' || this.gameStatus !== 'playing');
     return {
       ...seat,
       user: seat.user ? { ...seat.user } : null,

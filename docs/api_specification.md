@@ -632,13 +632,10 @@ const socket = io("http://localhost:3000", {
   "dealerId": 1,
   "baseAnte": 10,
   "totalPot": 30,
-  "handCards": [          // 服务端分别单发给各在座玩家自己的三张牌（本地盖牌等待翻开）
-    { "suit": "spades", "rank": 14 },
-    { "suit": "hearts", "rank": 14 },
-    { "suit": "diamonds", "rank": 14 }
-  ]
+  "handCards": null       // 2026-11 起固定为 null：底牌不再随开局下发
 }
 ```
+* **防偷看（2026-11 GrokBotLine）**：为防止改装客户端在闷牌（半价下注）状态下提前读取底牌，开局及看牌前的 `room:state` 都不包含本人底牌；玩家发出 `game:look` 后，底牌通过回调 `{ code: 200, cards }` 和随后的 `room:state` 下发。弃牌、比牌出局或牌局结束后，本人快照恢复显示本人底牌。
 
 #### 2. 看牌操作
 * **客户端发出**：`game:look`
@@ -820,7 +817,7 @@ export interface TableSeat {
   } | null;
   status: PlayerTableStatus;
   hasLooked: boolean;
-  cards: Card[] | null;     // 本人手牌，或本局直接比牌胜者获准查看的输者手牌；其余为 null
+  cards: Card[] | null;     // 本人已看牌（或已弃牌/出局/非对局阶段）时的手牌，或本局直接比牌胜者获准查看的输者手牌；其余为 null
   currentInvested: number;  // 本局已下注金额
   isReady: boolean;
 }
