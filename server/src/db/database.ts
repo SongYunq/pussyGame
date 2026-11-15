@@ -57,6 +57,14 @@ export function getDb(): DatabaseType {
   }
 }
 
+/** 关闭数据库连接（执行 WAL 检查点），供优雅停机与测试使用；之后再次 getDb 会重新打开。 */
+export function closeDb(): void {
+  if (!dbInstance) return;
+  try { dbInstance.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* 内存库等场景忽略 */ }
+  dbInstance.close();
+  dbInstance = null;
+}
+
 function initTables(db: DatabaseType) {
   // 1. 用户表
   db.exec(`

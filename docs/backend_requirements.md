@@ -157,7 +157,7 @@ server/
 
 ### 2.4 初始化、迁移与默认管理员
 
-[database.ts](../server/src/db/database.ts) 在开启 WAL 和外键后，以同一事务完成建表、增量迁移和默认管理员的账户/初始流水创建，全部成功后才发布单例连接；失败关闭连接，不保留半初始化状态。模型层通过 `statement(sql)` 获取按连接缓存的预编译语句（`WeakMap<Database, Map<sql, Statement>>`），固定 SQL 只编译一次；禁止把用户输入拼进 SQL 文本，否则既有注入风险也会撑大缓存。
+[database.ts](../server/src/db/database.ts) 在开启 WAL 和外键后，以同一事务完成建表、增量迁移和默认管理员的账户/初始流水创建，全部成功后才发布单例连接；失败关闭连接，不保留半初始化状态。服务收到 SIGTERM/SIGINT 时优雅停机：清理房间计时器、关闭 Socket.io 与 HTTP 服务，再以 `closeDb()` 执行 `wal_checkpoint(TRUNCATE)` 并关闭连接，10 秒未完成则强制退出；进行中的牌局内存状态仍不跨重启保留。模型层通过 `statement(sql)` 获取按连接缓存的预编译语句（`WeakMap<Database, Map<sql, Statement>>`），固定 SQL 只编译一次；禁止把用户输入拼进 SQL 文本，否则既有注入风险也会撑大缓存。
 
 `PRAGMA user_version = 1` 标识本次结构版本。旧库通过 `ALTER TABLE` 添加 `users.auth_version`、`ledgers.operator_id/room_id`，保留历史数据并安装同样的写入约束；未来版本高于当前服务支持范围时拒绝启动。本次审查未打开或迁移既有 `server/data/game.db`，迁移代码仅会在后续服务启动时执行，也未自动修正历史数据。
 

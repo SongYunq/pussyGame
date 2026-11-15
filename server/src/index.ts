@@ -5,7 +5,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { config } from './config/index.js';
-import { getDb } from './db/database.js';
+import { closeDb, getDb } from './db/database.js';
 import { authenticateHttp, requireAdmin } from './middlewares/authMiddleware.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { AuthController } from './controllers/authController.js';
@@ -109,6 +109,24 @@ export function startServer() {
     sweep.unref();
     server.on('close', () => clearInterval(sweep));
   }
+
+  // 优雅停机：停止接受新连接、断开 Socket、关闭数据库（落盘 WAL），超时强制退出。
+  let shuttingDown = false;
+  const shutdown = (signal: NodeJS.Signals) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[Server] 收到 ${signal}，正在优雅停机…`);
+    const force = setTimeout(() => process.exit(1), 10_000);
+    force.unref();
+    for (const room of RoomManager.getAllRooms()) room.dispose();
+    io.close(() => {
+      closeDb();
+      console.log('[Server] 已关闭全部连接与数据库');
+      process.exit(0);
+    });
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 
   server.listen(config.port, config.host, () => {
     console.log(`=======================================================`);
