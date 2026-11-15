@@ -4,6 +4,7 @@ import { RoomManager } from '../game/RoomManager.js';
 import { registerRoomEvents } from './roomEvents.js';
 import { registerGameEvents } from './gameEvents.js';
 import { registerChatEvents } from './chatEvents.js';
+import { releaseActionQuota } from './ack.js';
 
 export function setupSocketHandler(io: Server): void {
   // 1. Socket.io 连接鉴权中间件
@@ -61,6 +62,7 @@ export function setupSocketHandler(io: Server): void {
 
     // 断开连接处理
     socket.on('disconnect', () => {
+      releaseActionQuota(socket.id);
       RoomManager.recordUserOffline(userId, socket.id);
 
       const room = RoomManager.findRoomByUserId(userId);

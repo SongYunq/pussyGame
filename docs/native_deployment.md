@@ -44,7 +44,7 @@
 | 续期后重载钩子 | `/etc/letsencrypt/renewal-hooks/deploy/reload-zjh-nginx` |
 | 更新前数据库备份 | `/var/backups/zjh-game/before-20261018-native-002.db` |
 
-前后端在本机完成构建，服务器仅安装对应平台的生产依赖。`better-sqlite3` 包含原生模块，不能复制 macOS 的 `node_modules` 到 Ubuntu。环境需显式设置 `NODE_ENV=production`、`HOST=127.0.0.1`、`PORT=3000`、安全随机的 `JWT_SECRET`、管理员初始密码、数据库及静态资源的绝对路径。可选 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120，0 表示等待阶段离线座位永久保留）。
+前后端在本机完成构建，服务器仅安装对应平台的生产依赖。`better-sqlite3` 包含原生模块，不能复制 macOS 的 `node_modules` 到 Ubuntu。环境需显式设置 `NODE_ENV=production`、`HOST=127.0.0.1`、`PORT=3000`、安全随机的 `JWT_SECRET`、管理员初始密码、数据库及静态资源的绝对路径。建议设置 `CORS_ORIGIN` 为站点地址（留空允许任意来源）；可选 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120，0 表示等待阶段离线座位永久保留）。
 
 ## 后续发布与维护
 

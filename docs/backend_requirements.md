@@ -348,6 +348,8 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 | `room:stand` | 无 | Ack 回调 + 广播 `room:state` | 主动离座退回观战席（局中离座视同弃牌） |
 | `room:ready` | `{ isReady: boolean }` | Ack 回调 + 广播 `room:state` | 准备/取消准备（全员准备自动发牌开局） |
 
+> 传输层加固（2026-11 GrokBotLine）：Socket.io `maxHttpBufferSize` 收紧为 16KB；每个连接每 10 秒最多 40 个带确认动作，超限回复 `{ code: 429 }`，断开时释放计数。HTTP 关闭 `X-Powered-By`，统一追加 `X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: same-origin`，JSON 请求体上限 32KB（超限 413）。CORS 来源由 `CORS_ORIGIN`（逗号分隔）配置，留空沿用允许任意来源的历史行为。
+>
 > 实现说明（2026-11 GrokBotLine）：`game:*` 与 `room:*` 动作统一经 [`ack.ts`](../server/src/socket/ack.ts) 的 `onAction` 注册。回调取最后一个函数参数，负载非普通对象时按空对象处理；业务主动抛出的 `Error` 原文返回，`TypeError` 等运行时异常只返回兜底文案并记录服务端日志；无回调时改以 `error` 事件返回。成功确认先于随后的 `room:state` 广播发送。
 
 ### 5.3 牌局动作信令矩阵

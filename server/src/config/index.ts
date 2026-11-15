@@ -30,11 +30,15 @@ if (!Number.isInteger(offlineSeatGraceSeconds) || offlineSeatGraceSeconds < 0) {
   throw new Error('OFFLINE_SEAT_GRACE_SECONDS 必须为非负整数（0 表示不自动释放）');
 }
 
+// 允许的跨域来源：留空沿用历史行为（允许任意来源）；生产单端口部署建议设置为站点域名，多个以逗号分隔。
+const corsOrigins = (process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean);
+
 export const config = {
   host: process.env.HOST || '0.0.0.0',
   port,
   jwtSecret: configuredSecret || randomBytes(32).toString('hex'),
   jwtExpiresIn: 7 * 24 * 60 * 60, // 7 天 (以秒为单位)
+  corsOrigin: corsOrigins.length ? corsOrigins : '*' as string[] | '*',
   offlineSeatGraceMs: offlineSeatGraceSeconds * 1000, // 等待阶段离线座位保留时长，0 表示永久保留
   dbPath: process.env.DB_PATH === ':memory:' ? ':memory:' : path.resolve(process.cwd(), process.env.DB_PATH || 'data/game.db'),
   clientDistPath:

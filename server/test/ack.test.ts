@@ -58,3 +58,13 @@ test('无回调时通过 error 事件返回失败；afterAck 在回调之后执�
   socket.fire('ok', {}, () => order.push('ack'));
   assert.deepEqual(order, ['ack', 'after']);
 });
+
+test('单连接动作超限返回 429', () => {
+  const socket = new FakeSocket() as FakeSocket & { id: string };
+  socket.id = 'flood-socket';
+  onAction(socket as any, 'spam', '兜底', () => ({ code: 200 }));
+  const codes: number[] = [];
+  for (let i = 0; i < 45; i++) socket.fire('spam', {}, (r: any) => codes.push(r.code));
+  assert.equal(codes.filter(code => code === 200).length, 40);
+  assert.equal(codes.filter(code => code === 429).length, 5);
+});

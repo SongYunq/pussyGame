@@ -28,3 +28,13 @@ test('滑动窗口限流', () => {
   limiter.reset('a');
   assert.equal(limiter.retryAfterMs('a', 1001), 0);
 });
+
+test('限流器 sweep 清除过期键', () => {
+  const limiter = new SlidingWindowLimiter(1, 100);
+  limiter.tryConsume('x', 0);
+  limiter.tryConsume('y', 50);
+  limiter.sweep(120);
+  assert.equal(limiter.size, 1);
+  limiter.sweep(200);
+  assert.equal(limiter.size, 0);
+});

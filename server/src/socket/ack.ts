@@ -1,4 +1,8 @@
 import type { Socket } from 'socket.io';
+import { SlidingWindowLimiter } from '../utils/rateLimiter.js';
+
+// 每个连接每 10 秒最多 40 个带确认的动作，远高于正常操作频率，用于拦截脚本刷请求（如狂刷建房）。
+const actionLimiter = new SlidingWindowLimiter(40, 10_000);
 
 export interface AckResponse {
   code: number;
@@ -6,6 +10,11 @@ export interface AckResponse {
   [key: string]: unknown;
 }
 export type AckCallback = (response: AckResponse) => void;
+
+/** 连接断开时释放其限流记录。 */
+export function releaseActionQuota(socketId: string): void {
+  actionLimiter.reset(socketId);
+}
 
 /** 携带业务状态码的动作错误，例如房间不存在返回 404。 */
 export class SocketActionError extends Error {
@@ -34,6 +43,7 @@ export function toClientError(error: unknown, fallbackMessage: string): AckRespo
 /**
  * 注册带确认回调的 Socket 动作。
  * - 回调总是取最后一个函数参数，兼容 `emit(event, cb)` 与 `emit(event, data, cb)` 两种形式；
+ * - 每个连接受 actionLimiter 限流，超限回复 429；
  * - 成功时回复 handler 返回值（默认 `{ code: 200 }`），通过 afterAck 登记的任务在回调之后执行；失败时有回调则回调，否则向本连接发送 `error` 事件。
  */
 export function onAction(
@@ -46,6 +56,12 @@ export function onAction(
     const last = args[args.length - 1];
     const callback = typeof last === 'function' ? last as AckCallback : undefined;
     const data = asPayload(typeof args[0] === 'function' ? undefined : args[0]);
+    if (!actionLimiter.tryConsume(socket.id)) {
+      const response = { code: 429, message: '操作过于频繁，请稍后再试' };
+      if (callback) callback(response);
+      else socket.emit('error', response);
+      return;
+    }
     const deferred: Array<() => void> = [];
     try {
       const result = handler(data, task => { deferred.push(task); }) ?? { code: 200 };

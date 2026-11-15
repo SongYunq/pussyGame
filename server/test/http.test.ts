@@ -38,3 +38,15 @@ test('连续失败超过上限后返回 429，且不存在的用户名同样计�
   for (let i = 0; i < 10; i++) assert.equal((await login('ghost-user', 'whatever1')).status, 400);
   assert.equal((await login('ghost-user', 'whatever1')).status, 429);
 });
+
+test('响应带安全头且不暴露 X-Powered-By，超大请求体被拒绝', async () => {
+  const res = await fetch(`${base}/api/nope`);
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(res.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(res.headers.get('x-powered-by'), null);
+  const big = await fetch(`${base}/api/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'a', password: 'x'.repeat(64 * 1024) }),
+  });
+  assert.equal(big.status, 413);
+});

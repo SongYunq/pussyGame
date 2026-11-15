@@ -26,8 +26,17 @@ export function createApp() {
   getDb();
 
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  app.disable('x-powered-by');
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    // 轻量安全响应头：禁止 MIME 嗅探、禁止被第三方页面嵌入、限制 Referer 外泄。
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+  });
+  app.use(cors({ origin: config.corsOrigin }));
+  // 所有接口请求体都很小，限制 32KB 防止大包占用内存与 CPU。
+  app.use(express.json({ limit: '32kb' }));
 
   // 2. 注册 REST API 路由
   const apiRouter = express.Router();
@@ -84,9 +93,11 @@ export function startServer() {
 
   const io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: config.corsOrigin,
       methods: ['GET', 'POST'],
     },
+    // 单条信令负载都在 1KB 以内，默认 1MB 上限过大，收紧到 16KB。
+    maxHttpBufferSize: 16 * 1024,
   });
 
   setupSocketHandler(io);
