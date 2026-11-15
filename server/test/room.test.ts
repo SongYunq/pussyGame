@@ -99,3 +99,18 @@ test('扣款失败时奖池与个人投入保持不变', () => {
     assert.equal(room.currentTurnPlayerId, first);
   } finally { room.dispose(); }
 });
+
+test('庄位落在空座位时，开局后庄家归属到实际参与者且首位出牌人不变', () => {
+  const [a, b] = [createPlayer(), createPlayer()];
+  const room = new Room({ roomId: '4321', roomName: '庄位', baseAnte: 10, turnSeconds: 0, playerCount: 2 });
+  try {
+    room.dealerSeatIndex = 3; // 模拟上局庄家已离开
+    room.sit(a, 1);
+    room.sit(b, 5);
+    room.setReady(a, true);
+    room.setReady(b, true);
+    assert.equal(room.currentTurnPlayerId, b, '首位出牌人仍为原庄位顺时针下一位');
+    assert.equal(room.dealerSeatIndex, 1);
+    assert.equal(room.seats[room.dealerSeatIndex]?.user?.id, a);
+  } finally { room.dispose(); }
+});

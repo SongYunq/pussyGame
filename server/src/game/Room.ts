@@ -237,6 +237,12 @@ export class Room {
     if (nextTurnIdx === undefined) {
       nextTurnIdx = activeIndices[0];
     }
+    // 上局庄家已离座时，庄位落到首位出牌人逆时针方向最近的参与者，
+    // 首位出牌人保持不变，同时避免把庄家标记显示在空座位上。
+    if (!activeIndices.includes(this.dealerSeatIndex)) {
+      const position = activeIndices.indexOf(nextTurnIdx);
+      this.dealerSeatIndex = activeIndices[(position - 1 + activeIndices.length) % activeIndices.length];
+    }
 
     const currentSeat = this.seats[nextTurnIdx]!;
     this.currentTurnPlayerId = currentSeat.user!.id;
@@ -251,7 +257,7 @@ export class Room {
         for (const socketId of this.findSocketIdsByUserId(seat.user!.id)) {
           this.io.to(socketId).emit('game:start', {
             round: 1,
-            dealerId: this.seats[this.dealerSeatIndex]?.user?.id || currentSeat.user!.id,
+            dealerId: this.seats[this.dealerSeatIndex]!.user!.id,
             baseAnte: this.baseAnte,
             totalPot: this.totalPot,
             handCards: seat.cards,
