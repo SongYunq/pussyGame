@@ -1,6 +1,6 @@
-import { Card, DeckKind, EvaluatedHand, HandRankType, RandomSource, cardKey, createDeck, evaluateHand, shuffle } from './poker.js';
+import { Card, DeckKind, EvaluatedHand, HandRankType, RandomSource, cardKey, createDeck, evaluateHand, secureRandom, shuffle } from './poker.js';
 
-export const ALGORITHM_VERSION = '2.0.0';
+export const ALGORITHM_VERSION = '2.0.1';
 export const GUARANTEE_TYPES = ['pair', 'straight', 'flush', 'straight_flush', 'leopard'] as const;
 export type GuaranteeType = typeof GUARANTEE_TYPES[number];
 export type GuaranteeCounts = Record<GuaranteeType, number>;
@@ -149,7 +149,7 @@ function rivalHands(kind: DeckKind, combo: RivalCombo, random: RandomSource): Ca
 export interface DealtHand { cards: Card[]; source: 'random' | 'guarantee' | 'rival_weak' | 'rival_strong' }
 export interface DealResult { deckKind: DeckKind; mode: DealMode; rivalCombo?: RivalCombo; hands: DealtHand[]; algorithmVersion: string }
 
-export function dealHands(playerCount: number, config: AlgorithmConfig = defaultAlgorithmConfig(), random: RandomSource = Math.random): DealResult {
+export function dealHands(playerCount: number, config: AlgorithmConfig = defaultAlgorithmConfig(), random: RandomSource = secureRandom): DealResult {
   if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) throw new Error('发牌人数必须为 2～8 人');
   config = validateAlgorithmConfig(config);
   const deckKind = weighted(config.deckProbabilities, random);
