@@ -2,9 +2,17 @@ import { Socket, Server } from 'socket.io';
 import { RoomManager } from '../game/RoomManager.js';
 import { UserModel } from '../models/userModel.js';
 import { Room } from '../game/Room.js';
+import { onAction, SocketActionError } from './ack.js';
 
 export function registerRoomEvents(io: Server, socket: Socket): void {
   const userId = (socket as any).userId as number;
+
+  /** 遍历当前账号的全部在线连接（同账号多窗口共享房间归属）。 */
+  function forEachOwnSocket(visit: (peer: Socket) => void): void {
+    for (const peer of io.sockets.sockets.values()) {
+      if ((peer as any).userId === userId) visit(peer);
+    }
+  }
 
   function joinRoom(room: Room): void {
     const user = UserModel.findById(userId);
@@ -22,158 +30,86 @@ export function registerRoomEvents(io: Server, socket: Socket): void {
     }
     room.setIo(io);
     if (room.findSeatIndexByUserId(userId) === -1) room.addSpectator(user);
-    for (const peer of io.sockets.sockets.values()) {
-      if ((peer as any).userId !== userId) continue;
+    forEachOwnSocket(peer => {
       for (const channel of peer.rooms) {
         if (channel.startsWith('room:') && channel !== `room:${room.roomId}`) peer.leave(channel);
       }
       peer.join(`room:${room.roomId}`);
-    }
+    });
   }
 
+  const requireRoom = (message: string) => {
+    const room = RoomManager.findRoomByUserId(userId);
+    if (!room) throw new Error(message);
+    return room;
+  };
+
   // 1. 创建房间
-  socket.on('room:create', (data: { roomName: string; baseAnte: number; turnSeconds?: number; playerCount?: number }, callback) => {
-    try {
-      const room = RoomManager.createRoom(data.roomName, data.baseAnte, data.turnSeconds, io, data.playerCount);
-      try { joinRoom(room); }
-      catch (err) { RoomManager.removeEmptyRoom(room.roomId); throw err; }
-
-      if (typeof callback === 'function') {
-        callback({ code: 200, roomId: room.roomId });
-      }
-
-      room.broadcastState();
-    } catch (err: any) {
-      if (typeof callback === 'function') {
-        callback({ code: 400, message: err.message || '创建房间失败' });
-      } else {
-        socket.emit('error', { code: 400, message: err.message || '创建房间失败' });
-      }
-    }
+  onAction(socket, 'room:create', '创建房间失败', (data, afterAck) => {
+    const room = RoomManager.createRoom(
+      data.roomName as string, data.baseAnte as number, data.turnSeconds as number | undefined, io, data.playerCount as number | undefined,
+    );
+    try { joinRoom(room); }
+    catch (err) { RoomManager.removeEmptyRoom(room.roomId); throw err; }
+    afterAck(() => room.broadcastState());
+    return { code: 200, roomId: room.roomId };
   });
 
   // 2. 加入房间 (默认进入观战席)
-  socket.on('room:join', (data: { roomId: string }, callback) => {
-    try {
-      if (!data || typeof data.roomId !== 'string' || !/^\d{4,6}$/.test(data.roomId)) {
-        throw new Error('房间号必须为 4～6 位数字');
-      }
-      const room = RoomManager.getRoom(data.roomId);
-      if (!room) {
-        if (typeof callback === 'function') {
-          callback({ code: 404, message: '房间不存在' });
-        } else {
-          socket.emit('error', { code: 404, message: '房间不存在' });
-        }
-        return;
-      }
-
-      joinRoom(room);
-
-      if (typeof callback === 'function') {
-        callback({ code: 200, roomId: room.roomId });
-      }
-
+  onAction(socket, 'room:join', '加入房间失败', (data, afterAck) => {
+    if (typeof data.roomId !== 'string' || !/^\d{4,6}$/.test(data.roomId)) {
+      throw new Error('房间号必须为 4～6 位数字');
+    }
+    const room = RoomManager.getRoom(data.roomId);
+    if (!room) throw new SocketActionError('房间不存在', 404);
+    joinRoom(room);
+    afterAck(() => {
       // 给当前连入玩家立即定向推送最新的个人状态快照
       socket.emit('room:state', room.getMaskedState(userId));
       room.broadcastState();
-    } catch (err: any) {
-      if (typeof callback === 'function') {
-        callback({ code: 400, message: err.message || '加入房间失败' });
-      } else {
-        socket.emit('error', { code: 400, message: err.message || '加入房间失败' });
-      }
-    }
+    });
+    return { code: 200, roomId: room.roomId };
   });
 
-  socket.on('room:leave', (_data, callback) => {
-    try {
-      const room = RoomManager.findRoomByUserId(userId);
-      const roomId = room?.roomId ?? null;
-      if (room) {
-        room.stand(userId, false);
-        room.removeSpectator(userId);
-        for (const peer of io.sockets.sockets.values()) {
-          if ((peer as any).userId === userId) {
-            peer.leave(`room:${roomId}`);
-            peer.emit('room:left', { roomId });
-          }
-        }
-        room.broadcastState();
-        RoomManager.removeEmptyRoom(room.roomId);
-      }
-      if (typeof callback === 'function') callback({ code: 200, message: '已退出房间' });
-    } catch (err) {
-      if (typeof callback === 'function') callback({ code: 400, message: err instanceof Error ? err.message : '退出失败' });
+  onAction(socket, 'room:leave', '退出失败', () => {
+    const room = RoomManager.findRoomByUserId(userId);
+    if (room) {
+      const roomId = room.roomId;
+      room.stand(userId, false);
+      room.removeSpectator(userId);
+      forEachOwnSocket(peer => {
+        peer.leave(`room:${roomId}`);
+        peer.emit('room:left', { roomId });
+      });
+      room.broadcastState();
+      RoomManager.removeEmptyRoom(roomId);
     }
+    return { code: 200, message: '已退出房间' };
   });
 
   // 3. 选座坐下
-  socket.on('room:sit', (data: { seatIndex: number }, callback) => {
-    try {
-      const room = RoomManager.findRoomByUserId(userId);
-      if (!room) {
-        throw new Error('您当前未加入任何房间');
-      }
-
-      room.sit(userId, data.seatIndex);
-
-      if (typeof callback === 'function') {
-        callback({ code: 200, message: '入座成功' });
-      }
-
-      room.broadcastState();
-    } catch (err: any) {
-      if (typeof callback === 'function') {
-        callback({ code: 400, message: err.message || '入座失败' });
-      } else {
-        socket.emit('error', { code: 400, message: err.message || '入座失败' });
-      }
-    }
+  onAction(socket, 'room:sit', '入座失败', (data, afterAck) => {
+    const room = requireRoom('您当前未加入任何房间');
+    room.sit(userId, data.seatIndex as number);
+    afterAck(() => room.broadcastState());
+    return { code: 200, message: '入座成功' };
   });
 
   // 4. 离座 (起立成为观战)
-  socket.on('room:stand', (dataOrCallback, ack) => {
-    const callback = typeof dataOrCallback === 'function' ? dataOrCallback : ack;
-    try {
-      const room = RoomManager.findRoomByUserId(userId);
-      if (room) {
-        room.stand(userId, true);
-        room.broadcastState();
-      }
-      if (typeof callback === 'function') {
-        callback({ code: 200, message: '已离座' });
-      }
-    } catch (err: any) {
-      if (typeof callback === 'function') {
-        callback({ code: 400, message: err.message || '离座失败' });
-      } else {
-        socket.emit('error', { code: 400, message: err.message || '离座失败' });
-      }
+  onAction(socket, 'room:stand', '离座失败', (_data, afterAck) => {
+    const room = RoomManager.findRoomByUserId(userId);
+    if (room) {
+      room.stand(userId, true);
+      afterAck(() => room.broadcastState());
     }
+    return { code: 200, message: '已离座' };
   });
 
   // 5. 准备 / 取消准备
-  socket.on('room:ready', (data: { isReady: boolean }, callback) => {
-    try {
-      const room = RoomManager.findRoomByUserId(userId);
-      if (!room) {
-        throw new Error('未在房间中');
-      }
-
-      room.setReady(userId, data.isReady);
-
-      if (typeof callback === 'function') {
-        callback({ code: 200, message: '操作成功' });
-      }
-
-      room.broadcastState();
-    } catch (err: any) {
-      if (typeof callback === 'function') {
-        callback({ code: 400, message: err.message || '准备操作失败' });
-      } else {
-        socket.emit('error', { code: 400, message: err.message || '准备操作失败' });
-      }
-    }
+  onAction(socket, 'room:ready', '准备操作失败', (data, afterAck) => {
+    const room = requireRoom('未在房间中');
+    room.setReady(userId, data.isReady as boolean);
+    afterAck(() => room.broadcastState());
+    return { code: 200, message: '操作成功' };
   });
 }
