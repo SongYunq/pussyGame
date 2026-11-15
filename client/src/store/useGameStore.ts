@@ -101,3 +101,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     goldTimer = setTimeout(() => set({ isGoldStreamTriggered: false, goldStreamInfo: null }), 4200);
   },
 }));
+
+// 操作错误提示 5 秒后自动消失；期间出现新错误会重新计时，连接状态提示不受影响。
+const ERROR_TTL_MS = 5000;
+let errorTimer: ReturnType<typeof setTimeout> | undefined;
+useGameStore.subscribe((state, previous) => {
+  if (!state.error || state.error === previous.error) return;
+  clearTimeout(errorTimer);
+  const message = state.error;
+  errorTimer = setTimeout(() => {
+    if (useGameStore.getState().error === message) useGameStore.setState({ error: null });
+  }, ERROR_TTL_MS);
+});
