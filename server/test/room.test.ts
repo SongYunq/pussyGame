@@ -142,3 +142,15 @@ test('未看牌时本人快照不含底牌；看牌或弃牌后可见', () => {
     assert.equal(own(b)?.length, 3, '弃牌后不再影响下注倍率，可查看本人底牌');
   } finally { room.dispose(); }
 });
+
+test('快照携带 serverTime，限时房间带 turnDeadline', () => {
+  const [a, b] = [createPlayer(), createPlayer()];
+  const room = new Room({ roomId: '5555', roomName: '限时', baseAnte: 10, turnSeconds: 15, playerCount: 2 });
+  try {
+    room.sit(a, 0); room.sit(b, 1); room.setReady(a, true); room.setReady(b, true);
+    const before = Date.now();
+    const state = room.getMaskedState(a);
+    assert.ok(Math.abs(state.serverTime - before) < 1000);
+    assert.ok(state.turnDeadline! - state.serverTime > 14_000);
+  } finally { room.dispose(); }
+});

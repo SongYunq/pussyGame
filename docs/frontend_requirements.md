@@ -180,6 +180,7 @@ App 视图流转体系
 位于 [ActionPanel.tsx](../client/src/components/table/ActionPanel.tsx)：
 * **快捷表情浮空弹窗**：支持 8 种高频互动 Emoji（🔥 烈火、😎 墨镜帅、😭 痛哭、💀 绝望骷髅、💰 金币眼、👍 点赞、🚀 起飞、🍺 干杯）；
   * 发送后在对应玩家头像正上方生成 2.5 秒浮动放大、平滑淡出的动画气泡（`animate-float-up`）。
+* **出牌倒计时**（2026-11 GrokBotLine，已实现）：当前行动者头像左上角显示剩余秒数，≤5 秒变红闪烁；由 [`useTurnCountdown`](../client/src/hooks/useTurnCountdown.ts) 根据 `turnDeadline` 与 `room:state.serverTime` 校正后的本地时钟每 250ms 刷新，无限制思考时间的房间不显示。
 * **白名单共用**：表情与短语列表来自 [`server/src/shared/chat.ts`](../server/src/shared/chat.ts)，前端按下标上报 `phraseId`，服务端只广播白名单内容；
 * **快捷短语对话框**：预设 5 条经典金句（“快点吧，我等到花儿都谢了！”、“梭哈是一种智慧！”、“风水轮流转，底裤全靠这把！”、“老铁，稳住别慌！”、“搏一搏，单车变摩托！”）；
   * 头像旁弹出带倒三角指示箭头的漫画式白底对话框，展示 3.5 秒后自动隐去。

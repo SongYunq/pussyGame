@@ -324,7 +324,7 @@ public getMaskedState(forUserId?: number): RoomState {
 }
 ```
 
-广播实现（2026-11 GrokBotLine）：`broadcastState()` 只登记一次微任务，同一同步调用链（如“准备→自动开局→回调后广播”）中的多次调用合并为一次推送，推送时机在本链路已发出的事件与 Ack 之后；`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
+快照附带 `serverTime`（生成时的服务端毫秒时间），供客户端校正 `turnDeadline` 倒计时的时钟偏差。广播实现（2026-11 GrokBotLine）：`broadcastState()` 只登记一次微任务，同一同步调用链（如“准备→自动开局→回调后广播”）中的多次调用合并为一次推送，推送时机在本链路已发出的事件与 Ack 之后；`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
 
 ---
 

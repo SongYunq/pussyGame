@@ -769,6 +769,7 @@ export class Room {
       currentRound: this.currentRound,
       currentTurnPlayerId: this.currentTurnPlayerId,
       turnDeadline: this.turnDeadline,
+      serverTime: Date.now(),
       currentBet: this.currentBet,
       totalPot: this.totalPot,
       dealerSeatIndex: this.dealerSeatIndex,

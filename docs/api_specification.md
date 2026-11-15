@@ -837,6 +837,7 @@ export interface RoomState {
   currentRound: number;
   currentTurnPlayerId: number | null;
   turnDeadline: number | null;
+  serverTime: number;           // 生成快照时的服务端毫秒时间戳（2026-11 新增），客户端以 serverTime − 本地时间 校正时钟偏差后计算倒计时
   currentBet: number;
   totalPot: number;
   dealerSeatIndex: number;

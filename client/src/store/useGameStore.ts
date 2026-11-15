@@ -25,6 +25,7 @@ interface GameStore {
   floatingBubbles: FloatingBubble[];
   flyingChips: FlyingChip[];
   isMuted: boolean;
+  clockOffsetMs: number; // 服务端时间 − 本地时间
   reset: () => void;
   clearRoom: () => void;
   setCurrentUser: (user: UserProfile) => void;
@@ -50,7 +51,7 @@ const roomUi = () => ({ roomState: null, isPKSelecting: false, activePKClash: nu
 const ignore = (promise: Promise<unknown>) => { void promise.catch(() => {}); };
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  ...roomUi(), currentUser: null, connectionStatus: 'disconnected', actionPending: false, error: null, isMuted: sound.getMuted(),
+  ...roomUi(), currentUser: null, connectionStatus: 'disconnected', actionPending: false, error: null, isMuted: sound.getMuted(), clockOffsetMs: 0,
   reset: () => { clearTimeout(allInTimer); clearTimeout(goldTimer); set({ ...roomUi(), currentUser: null, connectionStatus: 'disconnected', actionPending: false, error: null }); },
   clearRoom: () => { clearTimeout(allInTimer); clearTimeout(goldTimer); set({ ...roomUi(), error: null }); },
   setCurrentUser: currentUser => set({ currentUser }),
@@ -58,7 +59,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const old = get().roomState;
     const newHand = old?.roomId !== roomState.roomId || roomState.gameStatus === 'waiting' || (roomState.currentRound === 1 && old.currentRound > 1);
     const mine = roomState.seats.find(seat => seat?.user?.id === get().currentUser?.id)?.user;
-    set(state => ({ roomState, flyingChips: newHand ? [] : state.flyingChips,
+    const clockOffsetMs = typeof roomState.serverTime === 'number' ? roomState.serverTime - Date.now() : get().clockOffsetMs;
+    set(state => ({ roomState, clockOffsetMs, flyingChips: newHand ? [] : state.flyingChips,
       currentUser: mine && state.currentUser ? { ...state.currentUser, balance: mine.balance } : state.currentUser }));
     if (mine) useAuthStore.getState().updateUser({ balance: mine.balance });
   },
