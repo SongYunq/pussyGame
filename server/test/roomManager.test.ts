@@ -59,3 +59,23 @@ test('房间名称限制 30 字符且禁止控制字符', () => {
   assert.equal(room.roomName, '名'.repeat(30));
   RoomManager.deleteRoom(room.roomId);
 });
+
+test('findRoomByUserId 缓存在用户换房/离房后仍返回实际归属', () => {
+  const u = createPlayer();
+  const r1 = RoomManager.createRoom('一号', 10, 20);
+  const r2 = RoomManager.createRoom('二号', 10, 20);
+  try {
+    r1.addSpectator({ id: u, nickname: 'u', avatar: 'a' });
+    assert.equal(RoomManager.findRoomByUserId(u), r1);
+    r1.removeSpectator(u);
+    r2.addSpectator({ id: u, nickname: 'u', avatar: 'a' });
+    assert.equal(RoomManager.findRoomByUserId(u), r2, '缓存失效后回退扫描');
+    r2.sit(u, 3);
+    assert.equal(RoomManager.findRoomByUserId(u), r2);
+    r2.stand(u, false);
+    assert.equal(RoomManager.findRoomByUserId(u), null);
+  } finally {
+    RoomManager.deleteRoom(r1.roomId);
+    RoomManager.deleteRoom(r2.roomId);
+  }
+});

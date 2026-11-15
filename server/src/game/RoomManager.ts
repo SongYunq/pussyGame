@@ -9,6 +9,8 @@ export class RoomManager {
   private static socketDisconnectors: Map<string, () => void> = new Map();
   // 记录用户最后一个连接断开的时间：userId -> 毫秒时间戳
   private static offlineSince: Map<number, number> = new Map();
+  // 用户→房间号的查找提示缓存，命中时仍会校验实际归属
+  private static userRoomHint: Map<number, string> = new Map();
 
   static createRoom(roomName: string, baseAnte: number = 10, turnSeconds: number = 20, io?: Server, playerCount: number = 2): Room {
     if (typeof roomName !== 'string') throw new Error('房间名称必须为文本');
@@ -54,16 +56,35 @@ export class RoomManager {
       if (room.gameStatus === 'playing') throw new Error('进行中的房间不可删除');
       room.dispose();
       this.rooms.delete(roomId);
+      for (const [userId, hintedId] of this.userRoomHint) {
+        if (hintedId === roomId) this.userRoomHint.delete(userId);
+      }
     }
   }
 
+  /**
+   * 查找用户所在房间。每个 Socket 动作都会调用，故先查“用户→房间”缓存并验证
+   * 用户仍在该房间内（座位或观战席）；缓存失效时回退全量扫描并刷新缓存。
+   * 房间状态由 Room 直接修改，缓存只作为提示，任何时候都以实际归属为准。
+   */
   static findRoomByUserId(userId: number): Room | null {
+    const hintedId = this.userRoomHint.get(userId);
+    if (hintedId !== undefined) {
+      const hinted = this.rooms.get(hintedId);
+      if (hinted && this.isMember(hinted, userId)) return hinted;
+      this.userRoomHint.delete(userId);
+    }
     for (const room of this.rooms.values()) {
-      if (room.findSeatIndexByUserId(userId) !== -1 || room.spectators.has(userId)) {
+      if (this.isMember(room, userId)) {
+        this.userRoomHint.set(userId, room.roomId);
         return room;
       }
     }
     return null;
+  }
+
+  private static isMember(room: Room, userId: number): boolean {
+    return room.spectators.has(userId) || room.findSeatIndexByUserId(userId) !== -1;
   }
 
   static recordUserOnline(userId: number, socketId: string, disconnect?: () => void): void {

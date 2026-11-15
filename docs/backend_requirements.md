@@ -102,7 +102,7 @@ server/
 │   │   ├── Card.ts             # 扑克定义 (Card, Deck, Fisher-Yates 洗牌)
 │   │   ├── GameReferee.ts      # 核心裁判引擎 (7大牌型判定、比牌PK、20轮决胜)
 │   │   ├── Room.ts             # 8人桌位状态机、下注流转、比牌结算、脱敏广播
-│   │   └── RoomManager.ts      # 4位房号分配、多房间实例映射、用户在线/房间追踪
+│   │   └── RoomManager.ts      # 4位房号分配、多房间实例映射、用户在线/房间追踪（用户→房间提示缓存，命中后校验实际归属）
 │   ├── socket/
 │   │   ├── socketHandler.ts    # Socket.io 握手鉴权中间件与生命周期分发
 │   │   ├── ack.ts              # 统一 Ack 动作注册：负载归一化、回调定位、错误脱敏
