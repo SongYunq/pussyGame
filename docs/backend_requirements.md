@@ -333,6 +333,7 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 * **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](../server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
   2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
+* **等待阶段离线占座释放**（2026-11 GrokBotLine，已实现）：`RoomManager` 记录每个账号最后一个连接断开的时间；服务端每 30 秒（或更短的宽限期）调用 `releaseOfflineSeats`，对 `waiting` 状态房间中离线超过 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120 秒，0 关闭）的在座玩家执行离座并离开房间，空房随之回收。`playing`/`settling` 阶段不释放，仍保留座位等待重连；牌局结束回到等待阶段后再按宽限期判断。
 
 HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.auth_version`，撤销该账号已有令牌并主动断开其全部在线连接。此次升级前没有版本字段的旧令牌也会失效，需要重新登录。
 

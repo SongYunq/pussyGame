@@ -25,11 +25,17 @@ if (!isTrimmedText(adminUsername, 64)) throw new Error('ADMIN_USER 格式无效'
 const port = Number(process.env.PORT || '3000');
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须为 1–65535 的整数');
 
+const offlineSeatGraceSeconds = Number(process.env.OFFLINE_SEAT_GRACE_SECONDS || '120');
+if (!Number.isInteger(offlineSeatGraceSeconds) || offlineSeatGraceSeconds < 0) {
+  throw new Error('OFFLINE_SEAT_GRACE_SECONDS 必须为非负整数（0 表示不自动释放）');
+}
+
 export const config = {
   host: process.env.HOST || '0.0.0.0',
   port,
   jwtSecret: configuredSecret || randomBytes(32).toString('hex'),
   jwtExpiresIn: 7 * 24 * 60 * 60, // 7 天 (以秒为单位)
+  offlineSeatGraceMs: offlineSeatGraceSeconds * 1000, // 等待阶段离线座位保留时长，0 表示永久保留
   dbPath: process.env.DB_PATH === ':memory:' ? ':memory:' : path.resolve(process.cwd(), process.env.DB_PATH || 'data/game.db'),
   clientDistPath:
     (process.env.CLIENT_DIST_PATH ? path.resolve(process.cwd(), process.env.CLIENT_DIST_PATH) : undefined) ||

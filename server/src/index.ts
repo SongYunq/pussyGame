@@ -13,6 +13,7 @@ import { UserController } from './controllers/userController.js';
 import { AdminController } from './controllers/adminController.js';
 import { AlgorithmController } from './controllers/algorithmController.js';
 import { setupSocketHandler } from './socket/socketHandler.js';
+import { RoomManager } from './game/RoomManager.js';
 
 function asyncHandler(handler: (req: Request, res: Response) => void | Promise<void>) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -89,6 +90,14 @@ export function startServer() {
   });
 
   setupSocketHandler(io);
+
+  // 定期释放等待阶段长期离线的座位，避免掉线玩家永久占座导致房间无法开局。
+  if (config.offlineSeatGraceMs > 0) {
+    const sweep = setInterval(() => RoomManager.releaseOfflineSeats(config.offlineSeatGraceMs),
+      Math.min(30_000, config.offlineSeatGraceMs));
+    sweep.unref();
+    server.on('close', () => clearInterval(sweep));
+  }
 
   server.listen(config.port, config.host, () => {
     console.log(`=======================================================`);

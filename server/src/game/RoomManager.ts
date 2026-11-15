@@ -7,6 +7,8 @@ export class RoomManager {
   // 记录在线用户的 Socket 映射：userId -> Set<socketId>
   private static userSockets: Map<number, Set<string>> = new Map();
   private static socketDisconnectors: Map<string, () => void> = new Map();
+  // 记录用户最后一个连接断开的时间：userId -> 毫秒时间戳
+  private static offlineSince: Map<number, number> = new Map();
 
   static createRoom(roomName: string, baseAnte: number = 10, turnSeconds: number = 20, io?: Server, playerCount: number = 2): Room {
     if (typeof roomName !== 'string') throw new Error('房间名称必须为文本');
@@ -65,6 +67,7 @@ export class RoomManager {
       this.userSockets.set(userId, new Set());
     }
     this.userSockets.get(userId)!.add(socketId);
+    this.offlineSince.delete(userId);
     if (disconnect) this.socketDisconnectors.set(socketId, disconnect);
   }
 
@@ -75,8 +78,40 @@ export class RoomManager {
       set.delete(socketId);
       if (set.size === 0) {
         this.userSockets.delete(userId);
+        this.offlineSince.set(userId, Date.now());
       }
     }
+  }
+
+  /**
+   * 释放等待阶段长期离线玩家占用的座位。
+   * 只处理 waiting 状态的房间，牌局进行中仍保留座位等待重连；超过宽限期仍离线的
+   * 玩家直接离开房间（不进入观战席），空房随之回收。返回被释放的座位数。
+   */
+  static releaseOfflineSeats(graceMs: number, now: number = Date.now()): number {
+    let released = 0;
+    for (const room of Array.from(this.rooms.values())) {
+      if (room.gameStatus !== 'waiting') continue;
+      let changed = false;
+      for (const seat of room.seats) {
+        const userId = seat?.user?.id;
+        if (userId === undefined) continue;
+        const since = this.offlineSince.get(userId);
+        if (since === undefined || this.userSockets.has(userId) || now - since < graceMs) continue;
+        room.stand(userId, false);
+        room.removeSpectator(userId);
+        released++;
+        changed = true;
+      }
+      if (changed) {
+        room.broadcastState();
+        this.removeEmptyRoom(room.roomId);
+      }
+    }
+    for (const [userId, since] of this.offlineSince) {
+      if (now - since >= graceMs && !this.findRoomByUserId(userId)) this.offlineSince.delete(userId);
+    }
+    return released;
   }
 
   static disconnectUser(userId: number): void {
