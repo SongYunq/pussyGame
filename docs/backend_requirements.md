@@ -105,6 +105,7 @@ server/
 │   │   └── RoomManager.ts      # 4位房号分配、多房间实例映射、用户在线/房间追踪
 │   ├── socket/
 │   │   ├── socketHandler.ts    # Socket.io 握手鉴权中间件与生命周期分发
+│   │   ├── ack.ts              # 统一 Ack 动作注册：负载归一化、回调定位、错误脱敏
 │   │   ├── roomEvents.ts       # 房间信令 (创建、加入、入座、起立、准备)
 │   │   ├── gameEvents.ts       # 牌局动作 (看牌、下注、弃牌、PK比牌)
 │   │   └── chatEvents.ts       # 快捷社交互动 (表情广播、短语广播)
@@ -342,6 +343,8 @@ HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.a
 | `room:sit` | `{ seatIndex: 0~7 }` | Ack 回调 + 广播 `room:state` | 选定空位入座（校验筹码 $\ge 10 \times 底注$） |
 | `room:stand` | 无 | Ack 回调 + 广播 `room:state` | 主动离座退回观战席（局中离座视同弃牌） |
 | `room:ready` | `{ isReady: boolean }` | Ack 回调 + 广播 `room:state` | 准备/取消准备（全员准备自动发牌开局） |
+
+> 实现说明（2026-11 GrokBotLine）：`game:*` 与 `room:*` 动作统一经 [`ack.ts`](../server/src/socket/ack.ts) 的 `onAction` 注册。回调取最后一个函数参数，负载非普通对象时按空对象处理；业务主动抛出的 `Error` 原文返回，`TypeError` 等运行时异常只返回兜底文案并记录服务端日志；无回调时改以 `error` 事件返回。成功确认先于随后的 `room:state` 广播发送。
 
 ### 5.3 牌局动作信令矩阵
 | 客户端上行事件 | 参数负载 | 业务响应 / 广播下行 | 功能说明 |
