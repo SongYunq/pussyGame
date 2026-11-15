@@ -344,8 +344,8 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 ### 5.2 房间与大厅信令矩阵
 | 客户端上行事件 | 参数负载 | 业务响应 / 广播下行 | 功能说明 |
 | :--- | :--- | :--- | :--- |
-| `room:create` | `{ roomName, baseAnte, turnSeconds }` | Ack 回调 `{ code: 200, roomId }` + 广播 | 创建新房间并自动加入观战 |
-| `room:join` | `{ roomId }` | Ack 回调 `{ code: 200, roomId }` + 定向快照 | 进入指定房间观战席 |
+| `room:create` | `{ roomName, baseAnte, turnSeconds, playerCount }` | Ack 回调 `{ code: 200, roomId }` + 广播 | 创建新房间并自动加入观战 |
+| `room:join` | `{ roomId }` | Ack 回调 `{ code: 200, roomId }` + 广播 `room:state`（含本账号全部连接） | 进入指定房间观战席 |
 | `room:sit` | `{ seatIndex: 0~7 }` | Ack 回调 + 广播 `room:state` | 选定空位入座（校验筹码 $\ge 10 \times 底注$） |
 | `room:stand` | 无 | Ack 回调 + 广播 `room:state` | 主动离座退回观战席（局中离座视同弃牌） |
 | `room:ready` | `{ isReady: boolean }` | Ack 回调 + 广播 `room:state` | 准备/取消准备（全员准备自动发牌开局） |
