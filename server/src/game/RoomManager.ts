@@ -7,12 +7,20 @@ export class RoomManager {
   // 记录在线用户的 Socket 映射：userId -> Set<socketId>
   private static userSockets: Map<number, Set<string>> = new Map();
   private static socketDisconnectors: Map<string, () => void> = new Map();
+  // 记录用户最后一个连接断开的时间：userId -> 毫秒时间戳
+  private static offlineSince: Map<number, number> = new Map();
+  // 用户→房间号的查找提示缓存，命中时仍会校验实际归属
+  private static userRoomHint: Map<number, string> = new Map();
 
   static createRoom(roomName: string, baseAnte: number = 10, turnSeconds: number = 20, io?: Server, playerCount: number = 2): Room {
     if (typeof roomName !== 'string') throw new Error('房间名称必须为文本');
-    if (typeof baseAnte !== 'number' || !Number.isFinite(baseAnte) || baseAnte <= 0
+    // 与前端输入框 maxLength=30 保持一致；房名会随每次 room:state 广播给全房间。
+    if (roomName.trim().length > 30 || /[\u0000-\u001f\u007f]/u.test(roomName)) {
+      throw new Error('房间名称不能超过 30 个字符且不能包含控制字符');
+    }
+    if (typeof baseAnte !== 'number' || !Number.isSafeInteger(baseAnte) || baseAnte <= 0
       || baseAnte * 10 > Number.MAX_SAFE_INTEGER) {
-      throw new Error('底注必须为有效的正数');
+      throw new Error('底注必须为正整数');
     }
     if (!Number.isInteger(turnSeconds)) throw new Error('思考时间必须为整数秒');
     if (!Number.isInteger(playerCount) || playerCount < 2 || playerCount > 8) throw new Error('房间人数必须为 2～8 的整数');
@@ -48,16 +56,35 @@ export class RoomManager {
       if (room.gameStatus === 'playing') throw new Error('进行中的房间不可删除');
       room.dispose();
       this.rooms.delete(roomId);
+      for (const [userId, hintedId] of this.userRoomHint) {
+        if (hintedId === roomId) this.userRoomHint.delete(userId);
+      }
     }
   }
 
+  /**
+   * 查找用户所在房间。每个 Socket 动作都会调用，故先查“用户→房间”缓存并验证
+   * 用户仍在该房间内（座位或观战席）；缓存失效时回退全量扫描并刷新缓存。
+   * 房间状态由 Room 直接修改，缓存只作为提示，任何时候都以实际归属为准。
+   */
   static findRoomByUserId(userId: number): Room | null {
+    const hintedId = this.userRoomHint.get(userId);
+    if (hintedId !== undefined) {
+      const hinted = this.rooms.get(hintedId);
+      if (hinted && this.isMember(hinted, userId)) return hinted;
+      this.userRoomHint.delete(userId);
+    }
     for (const room of this.rooms.values()) {
-      if (room.findSeatIndexByUserId(userId) !== -1 || room.spectators.has(userId)) {
+      if (this.isMember(room, userId)) {
+        this.userRoomHint.set(userId, room.roomId);
         return room;
       }
     }
     return null;
+  }
+
+  private static isMember(room: Room, userId: number): boolean {
+    return room.spectators.has(userId) || room.findSeatIndexByUserId(userId) !== -1;
   }
 
   static recordUserOnline(userId: number, socketId: string, disconnect?: () => void): void {
@@ -65,6 +92,7 @@ export class RoomManager {
       this.userSockets.set(userId, new Set());
     }
     this.userSockets.get(userId)!.add(socketId);
+    this.offlineSince.delete(userId);
     if (disconnect) this.socketDisconnectors.set(socketId, disconnect);
   }
 
@@ -75,8 +103,40 @@ export class RoomManager {
       set.delete(socketId);
       if (set.size === 0) {
         this.userSockets.delete(userId);
+        this.offlineSince.set(userId, Date.now());
       }
     }
+  }
+
+  /**
+   * 释放等待阶段长期离线玩家占用的座位。
+   * 只处理 waiting 状态的房间，牌局进行中仍保留座位等待重连；超过宽限期仍离线的
+   * 玩家直接离开房间（不进入观战席），空房随之回收。返回被释放的座位数。
+   */
+  static releaseOfflineSeats(graceMs: number, now: number = Date.now()): number {
+    let released = 0;
+    for (const room of Array.from(this.rooms.values())) {
+      if (room.gameStatus !== 'waiting') continue;
+      let changed = false;
+      for (const seat of room.seats) {
+        const userId = seat?.user?.id;
+        if (userId === undefined) continue;
+        const since = this.offlineSince.get(userId);
+        if (since === undefined || this.userSockets.has(userId) || now - since < graceMs) continue;
+        room.stand(userId, false);
+        room.removeSpectator(userId);
+        released++;
+        changed = true;
+      }
+      if (changed) {
+        room.broadcastState();
+        this.removeEmptyRoom(room.roomId);
+      }
+    }
+    for (const [userId, since] of this.offlineSince) {
+      if (now - since >= graceMs && !this.findRoomByUserId(userId)) this.offlineSince.delete(userId);
+    }
+    return released;
   }
 
   static disconnectUser(userId: number): void {

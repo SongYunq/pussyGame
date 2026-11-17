@@ -3,6 +3,7 @@ import { RoomState, CompareResultEvent, GameOverEvent } from '../types/game';
 import { useGameStore } from '../store/useGameStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { sound } from '../audio/SoundManager';
+import { QUICK_PHRASES } from '../../../server/src/shared/chat';
 
 type Ack = { code: number; message?: string; roomId?: string };
 class SocketService {
@@ -14,8 +15,9 @@ class SocketService {
     this.socket = io('/', { auth: { token }, transports: ['websocket'], autoConnect: false });
     const socket = this.socket;
     socket.on('connect', () => {
-      useGameStore.getState().clearRoom();
-      useGameStore.setState({ connectionStatus: 'connected', error: null });
+      // 重连时保留当前牌桌快照，避免界面闪回大厅；服务端随后会推送最新 room:state，
+      // 若已不在任何房间则推送 room:left 再清空。仅清理与旧连接相关的瞬时动效。
+      useGameStore.setState({ connectionStatus: 'connected', error: null, flyingChips: [], floatingBubbles: [], isPKSelecting: false });
     });
     socket.on('disconnect', reason => {
       useGameStore.setState({ connectionStatus: 'disconnected' });
@@ -94,6 +96,9 @@ class SocketService {
   public fold() { return this.request('game:fold'); }
   public compare(targetPlayerId: number) { return this.request('game:compare', { targetPlayerId }); }
   public sendEmoji(emojiId: string) { this.socket?.emit('chat:emoji', { emojiId }); }
-  public sendPhrase(text: string) { this.socket?.emit('chat:phrase', { phraseId: 0, text }); }
+  public sendPhrase(text: string) {
+    const phraseId = (QUICK_PHRASES as readonly string[]).indexOf(text);
+    if (phraseId !== -1) this.socket?.emit('chat:phrase', { phraseId, text });
+  }
 }
 export const socketService = new SocketService();

@@ -1,4 +1,4 @@
-import { getDb } from '../db/database.js';
+import { statement } from '../db/database.js';
 
 export interface LedgerItem {
   id: number;
@@ -29,13 +29,12 @@ function getOffset(page: number, pageSize: number): number {
 
 export class LedgerModel {
   static getUserLedger(userId: number, page: number = 1, pageSize: number = 20): { list: LedgerItem[]; total: number } {
-    const db = getDb();
     const offset = getOffset(page, pageSize);
 
-    const totalRow = db.prepare('SELECT COUNT(*) as count FROM ledgers WHERE user_id = ?').get(userId) as { count: number };
+    const totalRow = statement('SELECT COUNT(*) as count FROM ledgers WHERE user_id = ?').get(userId) as { count: number };
     const total = totalRow ? totalRow.count : 0;
 
-    const rows = db.prepare(`
+    const rows = statement(`
       SELECT id, type, amount, balance_after as balanceAfter, description, created_at as createdAt
       FROM ledgers
       WHERE user_id = ?
@@ -47,13 +46,12 @@ export class LedgerModel {
   }
 
   static getAuditLogs(page: number = 1, pageSize: number = 50): { list: AuditLogItem[]; total: number } {
-    const db = getDb();
     const offset = getOffset(page, pageSize);
 
-    const totalRow = db.prepare('SELECT COUNT(*) as count FROM ledgers').get() as { count: number };
+    const totalRow = statement('SELECT COUNT(*) as count FROM ledgers').get() as { count: number };
     const total = totalRow ? totalRow.count : 0;
 
-    const rows = db.prepare(`
+    const rows = statement(`
       SELECT 
         l.id,
         l.user_id as userId,

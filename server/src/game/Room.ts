@@ -1,4 +1,4 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { Card, CompareResultEvent, RoomState, TableSeat } from '../types/index.js';
 import { DeckKind, splitPot } from '../shared/poker.js';
 import { dealHands } from '../shared/dealing.js';
@@ -39,6 +39,7 @@ export class Room {
   private hasTriggeredFirstGold: boolean = false;
   private comparisonWins: Map<number, Set<number>> = new Map();
   private io?: Server;
+  private broadcastScheduled = false;
 
   constructor(options: RoomOptions) {
     this.roomId = options.roomId;
@@ -237,6 +238,12 @@ export class Room {
     if (nextTurnIdx === undefined) {
       nextTurnIdx = activeIndices[0];
     }
+    // 上局庄家已离座时，庄位落到首位出牌人逆时针方向最近的参与者，
+    // 首位出牌人保持不变，同时避免把庄家标记显示在空座位上。
+    if (!activeIndices.includes(this.dealerSeatIndex)) {
+      const position = activeIndices.indexOf(nextTurnIdx);
+      this.dealerSeatIndex = activeIndices[(position - 1 + activeIndices.length) % activeIndices.length];
+    }
 
     const currentSeat = this.seats[nextTurnIdx]!;
     this.currentTurnPlayerId = currentSeat.user!.id;
@@ -251,10 +258,10 @@ export class Room {
         for (const socketId of this.findSocketIdsByUserId(seat.user!.id)) {
           this.io.to(socketId).emit('game:start', {
             round: 1,
-            dealerId: this.seats[this.dealerSeatIndex]?.user?.id || currentSeat.user!.id,
+            dealerId: this.seats[this.dealerSeatIndex]!.user!.id,
             baseAnte: this.baseAnte,
             totalPot: this.totalPot,
-            handCards: seat.cards,
+            handCards: null, // 底牌改由 game:look 回调及看牌后的 room:state 下发
             deckKind: this.deckKind,
           });
         }
@@ -332,7 +339,10 @@ export class Room {
       payAmount = this.currentBet * betMultiplier;
     } else if (actionType === 'raise') {
       const targetBet = typeof chipOption === 'number' || typeof chipOption === 'string' ? Number(chipOption) : NaN;
-      if (!Number.isFinite(targetBet) || targetBet > Number.MAX_SAFE_INTEGER || targetBet <= this.currentBet) {
+      if (!Number.isSafeInteger(targetBet) || targetBet <= 0) {
+        throw new Error('加注档位必须为正整数');
+      }
+      if (targetBet <= this.currentBet) {
         throw new Error('加注档位必须大于当前单注');
       }
       nextBet = targetBet;
@@ -346,25 +356,14 @@ export class Room {
       nextBet = Math.max(this.currentBet, effectiveBet);
     }
 
-    if (!Number.isFinite(payAmount) || payAmount <= 0 || payAmount > Number.MAX_SAFE_INTEGER
-      || !Number.isFinite(nextBet) || nextBet > Number.MAX_SAFE_INTEGER
-      || this.totalPot + payAmount > Number.MAX_SAFE_INTEGER || this.totalPot + payAmount <= this.totalPot
-      || seat.currentInvested + payAmount > Number.MAX_SAFE_INTEGER || seat.currentInvested + payAmount <= seat.currentInvested) {
+    if (!Number.isFinite(nextBet) || nextBet > Number.MAX_SAFE_INTEGER) {
       throw new Error('下注金额超出有效范围');
     }
+    this.assertChargeable(seat, payAmount, '下注金额超出有效范围');
 
     // 扣减筹码
-    const res = UserModel.changeBalance(
-      userId,
-      -payAmount,
-      'bet',
-      `第 ${this.roomId} 房间${actionType === 'raise' ? '加注' : actionType === 'allin' ? '全押' : '跟注'}`,
-      { roomId: this.roomId }
-    );
+    this.chargeSeat(seat, payAmount, `第 ${this.roomId} 房间${actionType === 'raise' ? '加注' : actionType === 'allin' ? '全押' : '跟注'}`);
     this.currentBet = nextBet;
-    seat.user!.balance = res.balance;
-    seat.currentInvested += payAmount;
-    this.totalPot += payAmount;
 
     // 特效判定（5000+ 大金特效每局仅在首次达到时触发）
     let specialEffect: 'none' | 'gold' | 'allin' = 'none';
@@ -457,26 +456,13 @@ export class Room {
     const user = UserModel.findById(initiatorId);
     if (!user) throw new Error('用户不存在');
     initSeat.user!.balance = user.balance;
-    if (!Number.isFinite(cost) || cost <= 0 || cost > Number.MAX_SAFE_INTEGER
-      || this.totalPot + cost > Number.MAX_SAFE_INTEGER || this.totalPot + cost <= this.totalPot
-      || initSeat.currentInvested + cost > Number.MAX_SAFE_INTEGER || initSeat.currentInvested + cost <= initSeat.currentInvested) {
-      throw new Error('比牌金额超出有效范围');
-    }
+    this.assertChargeable(initSeat, cost, '比牌金额超出有效范围');
     if (user.balance < cost) {
       throw new Error('筹码不足，无法发起比牌');
     }
 
     // 扣除比牌花费
-    const changeRes = UserModel.changeBalance(
-      initiatorId,
-      -cost,
-      'bet',
-      `第 ${this.roomId} 房间发起比牌对决`,
-      { roomId: this.roomId }
-    );
-    initSeat.user!.balance = changeRes.balance;
-    initSeat.currentInvested += cost;
-    this.totalPot += cost;
+    this.chargeSeat(initSeat, cost, `第 ${this.roomId} 房间发起比牌对决`);
 
     // 裁判引擎判定胜负
     const result = GameReferee.compareHands(initSeat.cards!, targetSeat.cards!, 'A', this.deckKind);
@@ -730,18 +716,37 @@ export class Room {
     return this.seats.filter((s): s is TableSeat => s !== null && s.status === 'active');
   }
 
+  /** 校验一次扣款后金额、奖池与个人累计投入均处于安全整数范围内且确实增长。 */
+  private assertChargeable(seat: TableSeat, amount: number, message: string): void {
+    const fits = (base: number) => base + amount <= Number.MAX_SAFE_INTEGER && base + amount > base;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > Number.MAX_SAFE_INTEGER
+      || !fits(this.totalPot) || !fits(seat.currentInvested)) {
+      throw new Error(message);
+    }
+  }
+
+  /** 原子扣款并同步座位余额、个人投入与奖池；扣款失败时内存状态保持不变。 */
+  private chargeSeat(seat: TableSeat, amount: number, description: string): void {
+    const result = UserModel.changeBalance(seat.user!.id, -amount, 'bet', description, { roomId: this.roomId });
+    seat.user!.balance = result.balance;
+    seat.currentInvested += amount;
+    this.totalPot += amount;
+  }
+
   public findSeatIndexByUserId(userId: number): number {
     return this.seats.findIndex((s) => s !== null && s.user !== null && s.user.id === userId);
   }
 
   /**
    * 生成防作弊脱敏全量快照
-   * 仅本人手牌及本局直接击败玩家的手牌可见，其他人的 cards 为 null
+   * 本人手牌在看牌后（或弃牌/出局/非对局阶段）可见，本局直接击败玩家的手牌对胜者可见，其余 cards 为 null
    */
-  public getMaskedState(forUserId?: number): RoomState {
+  public getMaskedState(forUserId?: number, onlineUserIds: Set<number> = this.onlineUserIds()): RoomState {
     const maskedSeats: (TableSeat | null)[] = this.seats.map((seat) => {
       if (!seat) return null;
-      const isSelf = forUserId !== undefined && seat.user?.id === forUserId;
+      // 本人底牌仅在看牌后（或已不再参与下注时）下发，杜绝改装客户端“偷看后仍按闷牌半价下注”。
+      const isSelf = forUserId !== undefined && seat.user?.id === forUserId
+        && (seat.hasLooked || seat.status !== 'active' || this.gameStatus !== 'playing');
       const isDefeatedByViewer = forUserId !== undefined && seat.status === 'lost' && seat.user !== null
         && this.comparisonWins.get(forUserId)?.has(seat.user.id) === true;
       return {
@@ -756,7 +761,7 @@ export class Room {
       roomName: this.roomName,
       playerCount: this.playerCount,
       onlinePlayerIds: Array.from(new Set([...this.seats.flatMap(seat => seat?.user ? [seat.user.id] : []), ...this.spectators.keys()]))
-        .filter(id => !this.io || this.findSocketIdsByUserId(id).length > 0),
+        .filter(id => !this.io || onlineUserIds.has(id)),
       deckKind: this.deckKind,
       baseAnte: this.baseAnte,
       turnSeconds: this.turnSeconds,
@@ -764,6 +769,7 @@ export class Room {
       currentRound: this.currentRound,
       currentTurnPlayerId: this.currentTurnPlayerId,
       turnDeadline: this.turnDeadline,
+      serverTime: Date.now(),
       currentBet: this.currentBet,
       totalPot: this.totalPot,
       dealerSeatIndex: this.dealerSeatIndex,
@@ -773,29 +779,53 @@ export class Room {
   }
 
   /**
-   * 向全房间广播脱敏快照 (每个 Socket 单独脱敏)
+   * 向全房间广播脱敏快照 (每个用户单独脱敏)
+   * 先按用户分组房间内连接，同一用户的多个窗口共用一份快照；在线集合只计算一次，
+   * 避免原先“每个连接 × 每个玩家 × 遍历全部连接”的 O(S²·P) 开销。
    */
   public broadcastState(): void {
+    // 同一同步调用链中的多次广播合并为一次：例如“准备→自动开局→回调后广播”、
+    // “离座→弃牌→轮转”等路径过去会连续推送 2～3 份相同快照。
+    // 微任务在当前事件处理结束、任何 I/O 之前执行，先于本链路已发出的事件之后送达。
+    if (!this.io || this.broadcastScheduled) return;
+    this.broadcastScheduled = true;
+    queueMicrotask(() => {
+      this.broadcastScheduled = false;
+      this.flushBroadcast();
+    });
+  }
+
+  /** 立即向房间内每个用户推送其脱敏快照。 */
+  private flushBroadcast(): void {
     if (!this.io) return;
-
-    const roomChannel = `room:${this.roomId}`;
-    const sockets = this.io.sockets.adapter.rooms.get(roomChannel);
-    if (!sockets) return;
-
-    for (const socketId of sockets) {
-      const socket = this.io.sockets.sockets.get(socketId);
-      if (socket) {
-        const userId = (socket as any).userId;
-        const state = this.getMaskedState(userId);
-        socket.emit('room:state', state);
-      }
+    const socketsByUser = this.socketsByUser();
+    const onlineUserIds = new Set(socketsByUser.keys());
+    for (const [userId, sockets] of socketsByUser) {
+      const state = this.getMaskedState(userId, onlineUserIds);
+      for (const socket of sockets) socket.emit('room:state', state);
     }
   }
 
+  /** 房间频道内的已鉴权连接，按用户 ID 分组。 */
+  private socketsByUser(): Map<number, Socket[]> {
+    const result = new Map<number, Socket[]>();
+    if (!this.io) return result;
+    for (const socketId of this.io.sockets.adapter.rooms.get(`room:${this.roomId}`) ?? []) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      const userId = (socket as any)?.userId;
+      if (!socket || typeof userId !== 'number') continue;
+      const list = result.get(userId);
+      if (list) list.push(socket);
+      else result.set(userId, [socket]);
+    }
+    return result;
+  }
+
+  private onlineUserIds(): Set<number> {
+    return new Set(this.socketsByUser().keys());
+  }
+
   private findSocketIdsByUserId(userId: number): string[] {
-    if (!this.io) return [];
-    const socketIds = this.io.sockets.adapter.rooms.get(`room:${this.roomId}`);
-    return Array.from(socketIds ?? []).filter(socketId =>
-      (this.io!.sockets.sockets.get(socketId) as any)?.userId === userId);
+    return (this.socketsByUser().get(userId) ?? []).map(socket => socket.id);
   }
 }

@@ -72,6 +72,7 @@ export interface RoomState {
   currentRound: number;
   currentTurnPlayerId: number | null;
   turnDeadline: number | null;
+  serverTime?: number; // 服务端生成快照的时间，用于校正时钟偏差
   currentBet: number;       // 明牌单注基准，闷牌下注为其一半；不影响开局底注
   totalPot: number;
   dealerSeatIndex: number;

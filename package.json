@@ -12,6 +12,9 @@
     "client:preview": "npm --prefix client run preview",
     "server:dev": "npm --prefix server run dev",
     "server:build": "npm --prefix server run build",
-    "server:start": "npm --prefix server run start"
+    "server:start": "npm --prefix server run start",
+    "test": "npm --prefix server test",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "check": "npm run typecheck && npm test && npm run build"
   }
 }

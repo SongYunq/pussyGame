@@ -4,6 +4,8 @@ import { TableSeat as TableSeatType } from '../../types/game';
 import { Card3D } from './Card3D';
 import { evaluateHand } from '../../utils/pokerEvaluator';
 import { Swords } from 'lucide-react';
+import { useGameStore } from '../../store/useGameStore';
+import { useTurnCountdown } from '../../hooks/useTurnCountdown';
 
 interface TableSeatProps {
   seat: TableSeatType;
@@ -26,6 +28,7 @@ export const TableSeat: React.FC<TableSeatProps> = ({
   deckKind,
   isMe,
   isCurrentTurn,
+  turnDeadline,
   isPKSelecting,
   onSelectPKTarget,
   floatingBubble,
@@ -36,15 +39,18 @@ export const TableSeat: React.FC<TableSeatProps> = ({
   cardAngleDeg,
 }) => {
   const user = seat.user;
-  if (!user) return null;
+  const clockOffsetMs = useGameStore(state => state.clockOffsetMs);
+  const secondsLeft = useTurnCountdown(turnDeadline, clockOffsetMs, isCurrentTurn);
 
-  // 自身手牌识别
+  // 自身手牌识别（Hooks 必须在任何提前 return 之前调用）
   const handEvaluation = useMemo(() => {
     if (isMe && seat.hasLooked && seat.cards && seat.cards.length === 3) {
       return evaluateHand(seat.cards, deckKind);
     }
     return null;
   }, [isMe, seat.hasLooked, seat.cards, deckKind]);
+
+  if (!user) return null;
 
   const isAlive = seat.status === 'active';
   const isFolded = seat.status === 'folded';
@@ -166,6 +172,19 @@ export const TableSeat: React.FC<TableSeatProps> = ({
               </div>
             )}
           </div>
+
+          {/* 出牌倒计时（无限制房间不显示） */}
+          {isCurrentTurn && secondsLeft !== null && (
+            <span
+              role="timer"
+              aria-label={`剩余 ${secondsLeft} 秒`}
+              className={`absolute -top-2 -left-2 z-20 min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center text-[11px] font-black font-mono shadow border ${
+                secondsLeft <= 5 ? 'bg-red-600 border-red-300 text-white animate-pulse' : 'bg-amber-500 border-amber-200 text-slate-950'
+              }`}
+            >
+              {secondsLeft}
+            </span>
+          )}
 
           {/* 已看牌角标 */}
           {seat.hasLooked && isAlive && (

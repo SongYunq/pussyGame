@@ -117,7 +117,21 @@ export const TableView: React.FC<TableViewProps> = ({
         </div>
       </header>
 
-      {(error || connectionStatus !== 'connected') && <p role="alert" className="relative z-40 bg-rose-950 text-rose-200 text-sm px-4 py-2">{connectionStatus !== 'connected' ? '连接已断开，正在重连，请稍候…' : error}</p>}
+      {(error || connectionStatus !== 'connected') && (
+        <div role="alert" className="relative z-40 bg-rose-950 text-rose-200 text-sm px-4 py-2 flex items-center justify-between gap-3">
+          <span>{connectionStatus !== 'connected' ? '连接已断开，正在重连，请稍候…' : error}</span>
+          {connectionStatus === 'connected' && (
+            <button
+              type="button"
+              aria-label="关闭提示"
+              onClick={() => useGameStore.setState({ error: null })}
+              className="shrink-0 px-2 rounded text-rose-300 hover:text-white hover:bg-rose-900"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       <div className="px-4 py-1 text-xs text-slate-400">已入座 {seated.length} / {target} 人 · 观战 {roomState.spectators.length} 人</div>
       {/* 比牌选择目标提示横条 */}
       {isPKSelecting && (

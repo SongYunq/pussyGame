@@ -4,6 +4,7 @@ import { RoomManager } from '../game/RoomManager.js';
 import { registerRoomEvents } from './roomEvents.js';
 import { registerGameEvents } from './gameEvents.js';
 import { registerChatEvents } from './chatEvents.js';
+import { releaseActionQuota } from './ack.js';
 
 export function setupSocketHandler(io: Server): void {
   // 1. Socket.io 连接鉴权中间件
@@ -50,8 +51,12 @@ export function setupSocketHandler(io: Server): void {
     if (existingRoom) {
       socket.join(`room:${existingRoom.roomId}`);
       existingRoom.setIo(io);
-      socket.emit('room:state', existingRoom.getMaskedState(userId));
+      // 本连接已加入房间频道，合并后的广播会同时推送给它，无需重复定向发送。
       existingRoom.broadcastState();
+    } else {
+      // 明确告知客户端当前不在任何房间（如服务重启后房间已不存在），
+      // 客户端据此退出旧牌桌，而不必在每次重连时先清空界面。
+      socket.emit('room:left', { roomId: null });
     }
 
     // 注册各类事件
@@ -61,6 +66,7 @@ export function setupSocketHandler(io: Server): void {
 
     // 断开连接处理
     socket.on('disconnect', () => {
+      releaseActionQuota(socket.id);
       RoomManager.recordUserOffline(userId, socket.id);
 
       const room = RoomManager.findRoomByUserId(userId);
@@ -72,7 +78,6 @@ export function setupSocketHandler(io: Server): void {
         // 若仅在观战席，离开房间并清除
         if (room.spectators.has(userId) && !RoomManager.getUserOnlineStatus(userId).isOnline) {
           room.removeSpectator(userId);
-          room.broadcastState();
           RoomManager.removeEmptyRoom(room.roomId);
         }
         room.broadcastState();

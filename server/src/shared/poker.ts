@@ -18,6 +18,17 @@ export interface EvaluatedHand {
   suitRank: number;
 }
 
+/**
+ * 密码学安全的 [0, 1) 随机数，基于 Web Crypto（Node 19+ 与浏览器均内置 globalThis.crypto）。
+ * V8 的 Math.random 为 xorshift128+，观察足够多输出后可推算后续序列，不适合发牌。
+ */
+export const secureRandom: RandomSource = () => {
+  const words = new Uint32Array(2);
+  globalThis.crypto.getRandomValues(words);
+  // 21 + 32 = 53 位随机尾数，与 IEEE-754 双精度精度一致，结果严格小于 1。
+  return ((words[0] >>> 11) * 2 ** 32 + words[1]) / 2 ** 53;
+};
+
 export function rankToString(rank: number): string {
   return ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' } as Record<number, string>)[rank] ?? String(rank);
 }

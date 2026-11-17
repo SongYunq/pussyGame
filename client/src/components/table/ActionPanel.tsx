@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TableSeat } from '../../types/game';
 import { Eye, Flame, Swords, ShieldAlert, Sparkles, Smile, MessageSquare, ChevronUp } from 'lucide-react';
+import { QUICK_EMOJIS, QUICK_PHRASES } from '../../../../server/src/shared/chat';
 
 interface ActionPanelProps {
   mySeat: TableSeat | null;
@@ -17,14 +18,9 @@ interface ActionPanelProps {
   onSendPhrase: (phrase: string) => void;
 }
 
-const EMOJIS = ['🔥', '😎', '😭', '💀', '💰', '👍', '🚀', '🍺'];
-const PHRASES = [
-  '快点吧，我等到花儿都谢了！',
-  '梭哈是一种智慧！',
-  '风水轮流转，底裤全靠这把！',
-  '老铁，稳住别慌！',
-  '搏一搏，单车变摩托！',
-];
+// 表情与短语白名单与服务端共用，服务端只广播白名单内容。
+const EMOJIS = QUICK_EMOJIS;
+const PHRASES = QUICK_PHRASES;
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({
   mySeat,
@@ -241,7 +237,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
             {/* All-in 梭哈 */}
             <button
-              onClick={() => onBet('allin', myBalance)}
+              onClick={() => {
+                // 全押会一次性押上全部余额且不可撤销，误触代价极高，先二次确认。
+                if (window.confirm(`确定全押 ${myBalance.toLocaleString()} 筹码吗？此操作不可撤销。`)) onBet('allin', myBalance);
+              }}
               disabled={!isMyTurn || myBalance <= 0}
               className={`flex items-center justify-center whitespace-nowrap gap-1 px-3 py-2 rounded-xl text-xs font-black transition border shadow-lg ${
                 isMyTurn && myBalance > 0

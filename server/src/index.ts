@@ -5,7 +5,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { config } from './config/index.js';
-import { getDb } from './db/database.js';
+import { closeDb, getDb } from './db/database.js';
 import { authenticateHttp, requireAdmin } from './middlewares/authMiddleware.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { AuthController } from './controllers/authController.js';
@@ -13,6 +13,7 @@ import { UserController } from './controllers/userController.js';
 import { AdminController } from './controllers/adminController.js';
 import { AlgorithmController } from './controllers/algorithmController.js';
 import { setupSocketHandler } from './socket/socketHandler.js';
+import { RoomManager } from './game/RoomManager.js';
 
 function asyncHandler(handler: (req: Request, res: Response) => void | Promise<void>) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -25,8 +26,17 @@ export function createApp() {
   getDb();
 
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  app.disable('x-powered-by');
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    // 轻量安全响应头：禁止 MIME 嗅探、禁止被第三方页面嵌入、限制 Referer 外泄。
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+  });
+  app.use(cors({ origin: config.corsOrigin }));
+  // 所有接口请求体都很小，限制 32KB 防止大包占用内存与 CPU。
+  app.use(express.json({ limit: '32kb' }));
 
   // 2. 注册 REST API 路由
   const apiRouter = express.Router();
@@ -83,12 +93,40 @@ export function startServer() {
 
   const io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: config.corsOrigin,
       methods: ['GET', 'POST'],
     },
+    // 单条信令负载都在 1KB 以内，默认 1MB 上限过大，收紧到 16KB。
+    maxHttpBufferSize: 16 * 1024,
   });
 
   setupSocketHandler(io);
+
+  // 定期释放等待阶段长期离线的座位，避免掉线玩家永久占座导致房间无法开局。
+  if (config.offlineSeatGraceMs > 0) {
+    const sweep = setInterval(() => RoomManager.releaseOfflineSeats(config.offlineSeatGraceMs),
+      Math.min(30_000, config.offlineSeatGraceMs));
+    sweep.unref();
+    server.on('close', () => clearInterval(sweep));
+  }
+
+  // 优雅停机：停止接受新连接、断开 Socket、关闭数据库（落盘 WAL），超时强制退出。
+  let shuttingDown = false;
+  const shutdown = (signal: NodeJS.Signals) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[Server] 收到 ${signal}，正在优雅停机…`);
+    const force = setTimeout(() => process.exit(1), 10_000);
+    force.unref();
+    for (const room of RoomManager.getAllRooms()) room.dispose();
+    io.close(() => {
+      closeDb();
+      console.log('[Server] 已关闭全部连接与数据库');
+      process.exit(0);
+    });
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 
   server.listen(config.port, config.host, () => {
     console.log(`=======================================================`);

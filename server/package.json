@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "NODE_ENV=test DB_PATH=:memory: node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json"
   },
   "keywords": [
     "zhajinhua",
@@ -34,6 +36,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

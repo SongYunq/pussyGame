@@ -66,7 +66,7 @@
 1. **绝对权威防作弊（Zero-Trust Client）**：
    - 所有的扑克牌洗牌、发牌、点数大小判定、下注倍数、轮换倒计时均在服务端内存中由 [`GameReferee`](../server/src/game/GameReferee.ts) 与 [`Room`](../server/src/game/Room.ts) 严格决断；
    - 客户端只能上报操作意图（如 `game:look`, `game:bet`, `game:compare`），服务端严密校验合法性；
-   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌，以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
+   - **单连接单独脱敏**：服务端快照仅允许连接所属玩家查看本人手牌（存活且未看牌时同样为 `null`，看牌后才下发，防止改装客户端偷看后仍按闷牌半价下注），以及其本局直接比牌击败且仍在座位上的输者手牌；其余为 `null`，观战者视角全员为 `null`。
 2. **账户与流水的原子写入（SQLite Transactions）**：
    - 玩家入座直接使用钱包账户余额，所有底注、跟注、加注、比牌扣除与胜利奖金派发，均在 SQLite `db.transaction()` 中原子完成；
    - 每笔余额变化与对应流水在同一事务中提交；底注批扣和终局多笔派奖另有外层事务。该保证不覆盖内存牌局的进程崩溃恢复，详见第 2.6 节；
@@ -83,7 +83,7 @@ server/
 │   ├── config/
 │   │   └── index.ts            # 全局配置中心 (端口、JWT密钥、路径、默认管理员)
 │   ├── db/
-│   │   └── database.ts         # SQLite 单连接、WAL模式、增量迁移与管理员初始发号
+│   │   └── database.ts         # SQLite 单连接、WAL模式、增量迁移与管理员初始发号、预编译语句缓存 (statement)
 │   ├── types/
 │   │   └── index.ts            # 全局 TypeScript 接口契约定义
 │   ├── utils/
@@ -102,9 +102,10 @@ server/
 │   │   ├── Card.ts             # 扑克定义 (Card, Deck, Fisher-Yates 洗牌)
 │   │   ├── GameReferee.ts      # 核心裁判引擎 (7大牌型判定、比牌PK、20轮决胜)
 │   │   ├── Room.ts             # 8人桌位状态机、下注流转、比牌结算、脱敏广播
-│   │   └── RoomManager.ts      # 4位房号分配、多房间实例映射、用户在线/房间追踪
+│   │   └── RoomManager.ts      # 4位房号分配、多房间实例映射、用户在线/房间追踪（用户→房间提示缓存，命中后校验实际归属）
 │   ├── socket/
 │   │   ├── socketHandler.ts    # Socket.io 握手鉴权中间件与生命周期分发
+│   │   ├── ack.ts              # 统一 Ack 动作注册：负载归一化、回调定位、错误脱敏
 │   │   ├── roomEvents.ts       # 房间信令 (创建、加入、入座、起立、准备)
 │   │   ├── gameEvents.ts       # 牌局动作 (看牌、下注、弃牌、PK比牌)
 │   │   └── chatEvents.ts       # 快捷社交互动 (表情广播、短语广播)
@@ -156,7 +157,7 @@ server/
 
 ### 2.4 初始化、迁移与默认管理员
 
-[database.ts](../server/src/db/database.ts) 在开启 WAL 和外键后，以同一事务完成建表、增量迁移和默认管理员的账户/初始流水创建，全部成功后才发布单例连接；失败关闭连接，不保留半初始化状态。
+[database.ts](../server/src/db/database.ts) 在开启 WAL 和外键后，以同一事务完成建表、增量迁移和默认管理员的账户/初始流水创建，全部成功后才发布单例连接；失败关闭连接，不保留半初始化状态。服务收到 SIGTERM/SIGINT 时优雅停机：清理房间计时器、关闭 Socket.io 与 HTTP 服务，再以 `closeDb()` 执行 `wal_checkpoint(TRUNCATE)` 并关闭连接，10 秒未完成则强制退出；进行中的牌局内存状态仍不跨重启保留。模型层通过 `statement(sql)` 获取按连接缓存的预编译语句（`WeakMap<Database, Map<sql, Statement>>`），固定 SQL 只编译一次；禁止把用户输入拼进 SQL 文本，否则既有注入风险也会撑大缓存。
 
 `PRAGMA user_version = 1` 标识本次结构版本。旧库通过 `ALTER TABLE` 添加 `users.auth_version`、`ledgers.operator_id/room_id`，保留历史数据并安装同样的写入约束；未来版本高于当前服务支持范围时拒绝启动。本次审查未打开或迁移既有 `server/data/game.db`，迁移代码仅会在后续服务启动时执行，也未自动修正历史数据。
 
@@ -246,7 +247,7 @@ server/
 
 房间没有房主字段或房主开始事件。创建时选择 `playerCount`（2～8，省略默认 2）；达到指定人数、全部在线且全员准备时自动开局，管理员角色也不绕过准备条件。创建者仅自动进入观战席；“只有房主能开局”属于尚未采用的另一套产品规则。
 
-同账号至多归属一个房间，创建或加入另一房间前清理旧房的座位/观战身份及全部连接订阅；局中切房的离座动作按弃牌处理，不能留下两个房间的有效身份。仅最后一个连接断开时移除观战身份；座位继续保留以支持重连。等待中的最后连接断开会取消该座位准备并广播离线状态，重连须再次准备；离线座位保留且没有自动过期回收策略。`room:leave` 会按账号移除座位/观战身份，并取消全部标签页订阅、通知 `room:left`；局中退出先弃牌结算。
+同账号至多归属一个房间，创建或加入另一房间前清理旧房的座位/观战身份及全部连接订阅；局中切房的离座动作按弃牌处理，不能留下两个房间的有效身份。仅最后一个连接断开时移除观战身份；座位继续保留以支持重连。等待中的最后连接断开会取消该座位准备并广播离线状态，重连须再次准备；离线座位在等待阶段超过 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120 秒）后自动离座离房并回收空房（见 5.1）；牌局进行中仍保留。`room:leave` 会按账号移除座位/观战身份，并取消全部标签页订阅、通知 `room:left`；局中退出先弃牌结算。
 
 结算只接受 `playing` 状态，`settling` 时不能继续弃牌触发派奖；房间删除清理定时器且不允许直接删除进行中的房间。空房可回收，4 位房号耗尽明确报错。
 
@@ -266,6 +267,7 @@ export type PlayerTableStatus =
 
 ### 4.3 庄家定位与出牌回合流转
 1. **初始庄家**：开局默认为 0 号座位；首轮由庄家顺时针下一位存活玩家开始出牌；
+   - 若庄位座位已空（上局胜者离座）或不在本局参与者中，开局时首位出牌人仍按原庄位顺时针计算，庄位改记为首位出牌人逆时针方向最近的参与者，`game:start.dealerId` 与 `dealerSeatIndex` 始终指向真实参与者；
 2. **回合轮换 (`advanceTurn`)**：
    - 过滤所有状态为 `active` 的存活座位，按座位号升序排布；
    - 寻找当前操作者顺时针方向的下一位存活者；
@@ -277,7 +279,7 @@ export type PlayerTableStatus =
   * **开局底注**：所有玩家仍按 `baseAnte` 原额扣除，不受明暗牌倍率影响；
   * **未看牌（闷牌）**：下注额 = `currentBet * 0.5`；
   * **已看牌（明注）**：下注额 = `currentBet`；
-  * **加注（Raise）**：玩家传入新的加注档位（必须大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
+  * **加注（Raise）**：玩家传入新的加注档位（必须为正整数且大于当前 `currentBet`），更新 `currentBet` 为新值并扣除对应倍数筹码；
   * **全押（All-in）**：扣除玩家当前全部余额 `balance`，按 `balance / (hasLooked ? 1 : 0.5)` 折算单注。若折算值大于当前 `currentBet`，则抬高单注基准；
 * **下注特效广播**：每局首次单次下注金额 $\ge 5000$ 标记为 `specialEffect: 'gold'`（全屏大金盛典与女声播报），All-in 标记为 `specialEffect: 'allin'`（全押特效）。
 
@@ -306,7 +308,9 @@ export type PlayerTableStatus =
 public getMaskedState(forUserId?: number): RoomState {
   const maskedSeats = this.seats.map((seat) => {
     if (!seat) return null;
-    const isSelf = forUserId !== undefined && seat.user?.id === forUserId;
+    // 本人底牌仅在看牌后、或本人已弃牌/出局、或非 playing 阶段时下发（闷牌防偷看）。
+    const isSelf = forUserId !== undefined && seat.user?.id === forUserId
+      && (seat.hasLooked || seat.status !== 'active' || this.gameStatus !== 'playing');
     return {
       ...seat,
       user: seat.user ? { ...seat.user } : null,
@@ -320,6 +324,8 @@ public getMaskedState(forUserId?: number): RoomState {
 }
 ```
 
+快照附带 `serverTime`（生成时的服务端毫秒时间），供客户端校正 `turnDeadline` 倒计时的时钟偏差。广播实现（2026-11 GrokBotLine）：`broadcastState()` 只登记一次微任务，同一同步调用链（如“准备→自动开局→回调后广播”）中的多次调用合并为一次推送，推送时机在本链路已发出的事件与 Ack 之后；`broadcastState` 先将房间频道内连接按用户 ID 分组，在线用户集合只计算一次并传入 `getMaskedState(forUserId, onlineUserIds)`，同一账号多窗口复用同一份快照；不再为每个连接、每个玩家重复遍历全部连接。
+
 ---
 
 ## 五、 WebSocket (Socket.io) 实时网关规范
@@ -330,18 +336,23 @@ WebSocket 网关是驱动全桌实时通信的神经中枢，统一在 [`server/
 * **连接拦截**：客户端建立 Socket 连接时必须在 `auth.token` 中附带有效 JWT。中间件调用 [`verifyToken`](../server/src/utils/jwt.ts) 限定 HS256 并校验载荷、有效期和 `authVersion`，查询当前数据库用户身份后绑定至 Socket 实例；验签或凭据版本不符直接拒绝握手，每个入站事件还会再次检查；
 * **断线重连无缝恢复**：用户重新连入时，[`socketHandler.ts`](../server/src/socket/socketHandler.ts) 检索其历史所在的房间：
   1. 自动调用 `socket.join("room:" + roomId)`；
-  2. 立即单发一份该玩家合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌，零卡顿感。
+  2. 触发一次房间广播，该连接随房间内其他连接一起收到本人合法的 `room:state` 脱敏快照，前端瞬间恢复桌面状态与手牌。
+* **等待阶段离线占座释放**（2026-11 GrokBotLine，已实现）：`RoomManager` 记录每个账号最后一个连接断开的时间；服务端每 30 秒（或更短的宽限期）调用 `releaseOfflineSeats`，对 `waiting` 状态房间中离线超过 `OFFLINE_SEAT_GRACE_SECONDS`（默认 120 秒，0 关闭）的在座玩家执行离座并离开房间，空房随之回收。`playing`/`settling` 阶段不释放，仍保留座位等待重连；牌局结束回到等待阶段后再按宽限期判断。
 
-HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.auth_version`，撤销该账号已有令牌并主动断开其全部在线连接。此次升级前没有版本字段的旧令牌也会失效，需要重新登录。
+登录接口使用 [`SlidingWindowLimiter`](../server/src/utils/rateLimiter.ts) 对“用户名 + IP”失败次数限流（15 分钟 10 次，超限 429），并以异步 `bcrypt.compare` 及不存在用户的假哈希比对消除事件循环阻塞与用户名枚举时序差。HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.auth_version`，撤销该账号已有令牌并主动断开其全部在线连接。此次升级前没有版本字段的旧令牌也会失效，需要重新登录。
 
 ### 5.2 房间与大厅信令矩阵
 | 客户端上行事件 | 参数负载 | 业务响应 / 广播下行 | 功能说明 |
 | :--- | :--- | :--- | :--- |
-| `room:create` | `{ roomName, baseAnte, turnSeconds }` | Ack 回调 `{ code: 200, roomId }` + 广播 | 创建新房间并自动加入观战 |
-| `room:join` | `{ roomId }` | Ack 回调 `{ code: 200, roomId }` + 定向快照 | 进入指定房间观战席 |
+| `room:create` | `{ roomName, baseAnte, turnSeconds, playerCount }` | Ack 回调 `{ code: 200, roomId }` + 广播 | 创建新房间并自动加入观战 |
+| `room:join` | `{ roomId }` | Ack 回调 `{ code: 200, roomId }` + 广播 `room:state`（含本账号全部连接） | 进入指定房间观战席 |
 | `room:sit` | `{ seatIndex: 0~7 }` | Ack 回调 + 广播 `room:state` | 选定空位入座（校验筹码 $\ge 10 \times 底注$） |
 | `room:stand` | 无 | Ack 回调 + 广播 `room:state` | 主动离座退回观战席（局中离座视同弃牌） |
 | `room:ready` | `{ isReady: boolean }` | Ack 回调 + 广播 `room:state` | 准备/取消准备（全员准备自动发牌开局） |
+
+> 传输层加固（2026-11 GrokBotLine）：Socket.io `maxHttpBufferSize` 收紧为 16KB；每个连接每 10 秒最多 40 个带确认动作，超限回复 `{ code: 429 }`，断开时释放计数。HTTP 关闭 `X-Powered-By`，统一追加 `X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy: same-origin`，JSON 请求体上限 32KB（超限 413）。CORS 来源由 `CORS_ORIGIN`（逗号分隔）配置，留空沿用允许任意来源的历史行为。
+>
+> 实现说明（2026-11 GrokBotLine）：`game:*` 与 `room:*` 动作统一经 [`ack.ts`](../server/src/socket/ack.ts) 的 `onAction` 注册。回调取最后一个函数参数，负载非普通对象时按空对象处理；业务主动抛出的 `Error` 原文返回，`TypeError` 等运行时异常只返回兜底文案并记录服务端日志；无回调时改以 `error` 事件返回。成功确认先于随后的 `room:state` 广播发送。
 
 ### 5.3 牌局动作信令矩阵
 | 客户端上行事件 | 参数负载 | 业务响应 / 广播下行 | 功能说明 |
@@ -352,8 +363,9 @@ HTTP 同样按数据库当前角色鉴权。重置密码会原子递增 `users.a
 | `game:compare` | `{ targetPlayerId }` | Ack 回调 + 广播 `game:compare_result` | 发起绝密双人比牌 PK 对决 |
 
 ### 5.4 社交互动信令
-* `chat:emoji`：表情 ID 须为非空字符串且不超过 64 字符，合法时房间内广播 `chat:emoji_broadcast`，畸形消息忽略；
-* `chat:phrase`：短语 ID 为非负安全整数、文本非空且不超过 200 字符，合法时房间内广播 `chat:phrase_broadcast`，畸形消息忽略。
+* `chat:emoji`：表情须在 [`shared/chat.ts`](../server/src/shared/chat.ts) 的 `QUICK_EMOJIS` 白名单内，合法时房间内广播 `chat:emoji_broadcast`，其余忽略；
+* `chat:phrase`：按 `QUICK_PHRASES` 白名单解析（文本精确匹配优先，其次编号），只广播服务端标准文案，不转发自定义文本；
+* 两者共用 [`SlidingWindowLimiter`](../server/src/utils/rateLimiter.ts)：每账号每 10 秒最多 6 条，超出静默丢弃。
 
 ---
 
@@ -423,6 +435,16 @@ if (fs.existsSync(config.clientDistPath)) {
 验证覆盖裁判与发牌、满员准备、下注轮换、私密手牌、多窗口与断线重连、身份及权限、数据库事务、原子账本、配置保存与生产启动。测试使用独立内存或临时数据库，不写入实际玩家库；通过验证不代表已实现整局中断恢复或线上充值提现。
 
 2026-10-19 起，测试源码、测试配置及专用依赖清单仅留本机，仓库不再声明测试命令和专用测试依赖。游戏仓库的正式入口保持 `npm run build` 和 `npm start`；本机维护者使用另行保存的测试入口继续验收。旧验证记录见 [数据库与服务审查记录](database_service_review.md)。
+
+2026-11 GrokBotLine 分支（待维护者确认）：为便于审查本分支的优化，新增一套随仓库提交的轻量测试，与本机私有测试（`/server/tests/`，仍被忽略）互不冲突。该做法与上一段 2026-10-19 的“测试仅留本机”约定不同，是否保留由维护者决定；如不保留，删除 `server/test/`、`server/package.json` 中的 `test`/`typecheck` 脚本与 `socket.io-client` 开发依赖，以及根目录 `test`/`typecheck`/`check` 脚本即可，业务代码不依赖它们。
+
+| 命令 | 作用 |
+| :--- | :--- |
+| `npm --prefix server test` | Node 内置 `node:test` + `tsx`，使用 `NODE_ENV=test DB_PATH=:memory:`，覆盖裁判、发牌随机源、房间状态机、RoomManager、Ack 注册器、聊天白名单与限流、HTTP 登录限流与安全头、Socket.io 端到端流程 |
+| `npm run typecheck` | 服务端 `src` + `test` 与客户端的 TypeScript 类型检查 |
+| `npm run check` | 依次执行类型检查、服务端测试与双端构建 |
+
+注意：`better-sqlite3@11` 暂无 Node 24 预编译包，在无编译工具链的环境请使用 Node 22 LTS 安装依赖。
 
 ## 九、 规则进阶探索与扩展设计：爆金币赏金击杀流 (Bounty Mode)
 

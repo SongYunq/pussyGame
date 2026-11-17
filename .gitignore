@@ -63,3 +63,6 @@ test-results/
 /.dockerignore
 /backups/
 /releases/
+
+# Vite dependency pre-bundling cache
+client/.vite/

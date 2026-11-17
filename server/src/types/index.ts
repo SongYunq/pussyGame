@@ -50,6 +50,7 @@ export interface RoomState {
   currentRound: number;
   currentTurnPlayerId: number | null;
   turnDeadline: number | null;
+  serverTime: number;       // 生成快照时的服务端毫秒时间戳，客户端据此校正本地时钟偏差后计算倒计时
   currentBet: number;       // 明牌单注基准，闷牌下注为其一半；不影响开局底注
   totalPot: number;
   dealerSeatIndex: number;

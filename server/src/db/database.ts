@@ -1,10 +1,30 @@
 import fs from 'fs';
 import path from 'path';
-import Database, { Database as DatabaseType } from 'better-sqlite3';
+import Database, { Database as DatabaseType, Statement } from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { config } from '../config/index.js';
 
 let dbInstance: DatabaseType | null = null;
+const statementCache = new WeakMap<DatabaseType, Map<string, Statement>>();
+
+/**
+ * 获取当前连接上缓存的预编译语句。better-sqlite3 每次 prepare 都会重新解析 SQL，
+ * 下注、看牌、结算等热路径每个动作要执行多条固定 SQL，缓存后只编译一次。
+ */
+export function statement(sql: string): Statement {
+  const db = getDb();
+  let cache = statementCache.get(db);
+  if (!cache) {
+    cache = new Map();
+    statementCache.set(db, cache);
+  }
+  let prepared = cache.get(sql);
+  if (!prepared) {
+    prepared = db.prepare(sql);
+    cache.set(sql, prepared);
+  }
+  return prepared;
+}
 
 export function getDb(): DatabaseType {
   if (dbInstance) {
@@ -35,6 +55,14 @@ export function getDb(): DatabaseType {
     db.close();
     throw error;
   }
+}
+
+/** 关闭数据库连接（执行 WAL 检查点），供优雅停机与测试使用；之后再次 getDb 会重新打开。 */
+export function closeDb(): void {
+  if (!dbInstance) return;
+  try { dbInstance.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* 内存库等场景忽略 */ }
+  dbInstance.close();
+  dbInstance = null;
 }
 
 function initTables(db: DatabaseType) {
